@@ -10,6 +10,31 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function initDatabaseWithRetry(maxRetries = 15, retryDelayMs = 3000) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+    try {
+      await initDatabase();
+      console.log('Database connection established.');
+      return;
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `Database connection attempt ${attempt}/${maxRetries} failed: ${error?.message || error}`
+      );
+
+      if (attempt < maxRetries) {
+        await wait(retryDelayMs);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'mk-tech-backend' });
 });
@@ -36,7 +61,7 @@ app.use((error, req, res, next) => {
 
 async function startServer() {
   try {
-    await initDatabase();
+    await initDatabaseWithRetry();
 
     app.listen(config.port, () => {
       console.log(`Backend API is running on http://localhost:${config.port}`);
