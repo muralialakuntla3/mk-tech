@@ -41,8 +41,8 @@ const FrontPage = () => {
   return (
     <div className="login-page">
       <div className="login-left">
-        <p className="portal-tag">MK Tech learning platform</p>
-        <h1 className="brand-name">Three-tier course portal</h1>
+        <p className="portal-tag">MK</p>
+        <h1 className="brand-name">MK Tech learning platfor</h1>
         <p className="brand-subtitle">
           Sign in to manage courses, register learners, and watch assigned training videos using the
           new Node.js + PostgreSQL backend.
