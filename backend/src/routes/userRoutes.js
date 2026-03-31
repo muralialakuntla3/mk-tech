@@ -14,6 +14,7 @@ router.get('/courses', async (req, res, next) => {
           c.id AS course_id,
           c.title AS course_title,
           c.description,
+          c.image_url,
           cv.id AS video_id,
           cv.title AS video_title,
           cv.video_url,
@@ -36,6 +37,7 @@ router.get('/courses', async (req, res, next) => {
           id: row.course_id,
           title: row.course_title,
           description: row.description,
+          imageUrl: row.image_url || '',
           videos: [],
         };
 
