@@ -3,10 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import { apiRequest, clearStoredAuth, getStoredAuth } from '../lib/api';
 import './AdminPortal.css';
 
+const getEmbedUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtube.com')) {
+      const videoId = parsed.searchParams.get('v');
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+    if (parsed.hostname.includes('youtu.be')) {
+      const id = parsed.pathname.replace('/', '');
+      if (id) {
+        return `https://www.youtube.com/embed/${id}`;
+      }
+    }
+    return url;
+  } catch {
+    return url;
+  }
+};
+
 const UserPortal = () => {
   const navigate = useNavigate();
   const auth = getStoredAuth();
   const [courses, setCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -50,32 +73,55 @@ const UserPortal = () => {
         <div className="empty-state">You are not registered for any course yet.</div>
       ) : null}
 
-      <div className="course-list-grid">
-        {courses.map((course) => (
-          <section className="portal-card" key={course.id}>
-            <h2>{course.title}</h2>
-            <p>{course.description || 'No description available for this course yet.'}</p>
-
-            <div className="video-list">
-              {course.videos?.length ? (
-                course.videos.map((video) => (
-                  <a
-                    key={video.id}
-                    className="video-link"
-                    href={video.videoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    ▶ {video.title}
-                  </a>
-                ))
-              ) : (
-                <span className="muted-text">No videos added yet.</span>
-              )}
-            </div>
-          </section>
-        ))}
-      </div>
+      {!selectedCourse ? (
+        <div className="course-list-grid">
+          {courses.map((course) => (
+            <section className="portal-card" key={course.id}>
+              {course.imageUrl ? <img src={course.imageUrl} alt={course.title} className="course-image" /> : null}
+              <h2>{course.title}</h2>
+              <p>{course.description || 'No description available for this course yet.'}</p>
+              <p className="muted-text">{course.videos?.length || 0} videos</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCourse(course);
+                  setSelectedVideo(course.videos?.[0] || null);
+                }}
+              >
+                Open course
+              </button>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <section className="portal-card">
+          <div className="section-title-row">
+            <h2>{selectedCourse.title}</h2>
+            <button type="button" onClick={() => setSelectedCourse(null)}>Back to courses</button>
+          </div>
+          <p>{selectedCourse.description || 'No description available.'}</p>
+          <div className="video-player-shell">
+            {selectedVideo ? (
+              <iframe
+                title={selectedVideo.title}
+                src={getEmbedUrl(selectedVideo.videoUrl)}
+                className="video-frame"
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                allowFullScreen
+              />
+            ) : (
+              <div className="empty-state">No videos available in this course.</div>
+            )}
+          </div>
+          <div className="video-list">
+            {(selectedCourse.videos || []).map((video) => (
+              <button type="button" key={video.id} className="video-link" onClick={() => setSelectedVideo(video)}>
+                ▶ {video.title}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 };

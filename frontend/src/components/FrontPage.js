@@ -42,10 +42,9 @@ const FrontPage = () => {
     <div className="login-page">
       <div className="login-left">
         <p className="portal-tag">MK</p>
-        <h1 className="brand-name">MK Tech learning platfor</h1>
+        <h1 className="brand-name">Welcome to MK Tech Learning Platform</h1>
         <p className="brand-subtitle">
-          Sign in to manage courses, register learners, and watch assigned training videos using the
-          new Node.js + PostgreSQL backend.
+          Sign in to watch your course videos.
         </p>
 
         <div className="login-card">
@@ -76,19 +75,14 @@ const FrontPage = () => {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
-
-          <div className="credential-hint">
-            <strong>Default admin:</strong> <code>admin</code> / <code>admin</code>
-          </div>
         </div>
       </div>
 
       <div className="login-right">
         <div className="hero-panel">
-          <h2>What this app now supports</h2>
+          <h2>Platform Features</h2>
           <ul className="feature-list">
-            <li>Admin login backed by PostgreSQL</li>
-            <li>Course creation with multiple video links</li>
+            <li>Manage tech courses</li>
             <li>User onboarding and course registration</li>
             <li>Learner view for assigned course videos</li>
           </ul>

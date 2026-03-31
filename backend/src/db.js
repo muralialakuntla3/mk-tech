@@ -26,6 +26,7 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(80) UNIQUE NOT NULL,
+        email VARCHAR(160) UNIQUE,
         password_hash TEXT NOT NULL,
         full_name VARCHAR(120) NOT NULL,
         role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'user')),
@@ -38,8 +39,19 @@ async function initDatabase() {
         id SERIAL PRIMARY KEY,
         title VARCHAR(120) UNIQUE NOT NULL,
         description TEXT DEFAULT '',
+        image_url TEXT DEFAULT '',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS email VARCHAR(160) UNIQUE
+    `);
+
+    await client.query(`
+      ALTER TABLE courses
+      ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''
     `);
 
     await client.query(`

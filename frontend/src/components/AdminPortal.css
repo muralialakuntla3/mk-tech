@@ -4,6 +4,36 @@
   background: linear-gradient(180deg, #f5f8ff 0%, #eef3fb 100%);
 }
 
+.console-layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 20px;
+}
+
+.left-nav {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  box-shadow: 0 16px 32px rgba(31, 52, 97, 0.08);
+}
+
+.left-nav button {
+  border: 1px solid #d7deeb;
+  background: #f6f9ff;
+  color: #1f2a44;
+}
+
+.left-nav .nav-active {
+  background: #2e55ff;
+  color: #ffffff;
+  border-color: #2e55ff;
+}
+
 .user-shell {
   background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 100%);
 }
@@ -94,7 +124,8 @@
 
 .stack-form input,
 .stack-form textarea,
-.inline-form input {
+.inline-form input,
+.stack-form select {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid #d7deeb;
@@ -175,6 +206,8 @@
   background: #eef3ff;
   color: #2f4bc8;
   text-decoration: none;
+  border: none;
+  cursor: pointer;
 }
 
 .video-link:hover {
@@ -206,7 +239,71 @@
   color: #4b5565;
 }
 
+.course-image {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.video-player-shell {
+  margin: 12px 0 16px;
+}
+
+.video-frame {
+  width: 100%;
+  min-height: 420px;
+  border: none;
+  border-radius: 12px;
+  background: #000;
+}
+
+.theme-dark {
+  background: linear-gradient(180deg, #141824 0%, #0f1320 100%);
+  color: #e9eefc;
+}
+
+.theme-dark .portal-card,
+.theme-dark .left-nav {
+  background: #1a2236;
+  box-shadow: none;
+}
+
+.theme-dark .portal-heading,
+.theme-dark .portal-card h2,
+.theme-dark .portal-card h3,
+.theme-dark .field-label {
+  color: #f1f5ff;
+}
+
+.theme-dark .portal-subtitle,
+.theme-dark .muted-text,
+.theme-dark .user-summary p {
+  color: #c0c9dc;
+}
+
+.theme-dark .stack-form input,
+.theme-dark .stack-form textarea,
+.theme-dark .inline-form input,
+.theme-dark .stack-form select {
+  background: #101827;
+  border-color: #31415f;
+  color: #e9eefc;
+}
+
+.theme-dark .course-card-panel,
+.theme-dark .user-summary,
+.theme-dark .empty-state {
+  background: #11192a;
+  border-color: #2b3a57;
+}
+
 @media (max-width: 900px) {
+  .console-layout {
+    grid-template-columns: 1fr;
+  }
+
   .portal-topbar,
   .section-title-row {
     flex-direction: column;
