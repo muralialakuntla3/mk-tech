@@ -7,6 +7,7 @@ const FrontPage = () => {
   const navigate = useNavigate();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -60,14 +61,19 @@ const FrontPage = () => {
             />
 
             <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter your password"
-              required
-            />
+            <div className="password-field">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                required
+              />
+              <button type="button" className="password-toggle" onClick={() => setShowPassword((current) => !current)}>
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
 
             {error ? <div className="form-message error-message">{error}</div> : null}
 
@@ -78,16 +84,7 @@ const FrontPage = () => {
         </div>
       </div>
 
-      <div className="login-right">
-        <div className="hero-panel">
-          <h2>Platform Features</h2>
-          <ul className="feature-list">
-            <li>Manage tech courses</li>
-            <li>User onboarding and course registration</li>
-            <li>Learner view for assigned course videos</li>
-          </ul>
-        </div>
-      </div>
+      <div className="login-right" aria-hidden="true" />
     </div>
   );
 };

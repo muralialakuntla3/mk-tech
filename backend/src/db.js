@@ -71,6 +71,20 @@ async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS course_modules (
+        id SERIAL PRIMARY KEY,
+        course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title VARCHAR(150) NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      ALTER TABLE course_videos
+      ADD COLUMN IF NOT EXISTS module_id INTEGER REFERENCES course_modules(id) ON DELETE SET NULL
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS user_courses (
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -81,6 +95,7 @@ async function initDatabase() {
 
     const masterUsername = config.masterAdmin.username?.trim().toLowerCase();
     const masterPassword = config.masterAdmin.password?.trim();
+    const masterEmail = config.masterAdmin.email?.trim().toLowerCase() || null;
 
     if (masterUsername && masterPassword) {
       const adminCheck = await client.query(
@@ -93,10 +108,10 @@ async function initDatabase() {
 
         await client.query(
           `
-            INSERT INTO users (username, password_hash, full_name, role)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO users (username, email, password_hash, full_name, role)
+            VALUES ($1, $2, $3, $4, $5)
           `,
-          [masterUsername, passwordHash, 'Master Admin', 'admin']
+          [masterUsername, masterEmail, passwordHash, 'Master Admin', 'admin']
         );
 
         console.log(`Master admin created with username "${masterUsername}".`);

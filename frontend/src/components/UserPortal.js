@@ -31,7 +31,7 @@ const getEmbedUrl = (url) => {
 const UserPortal = () => {
   const navigate = useNavigate();
   const auth = getStoredAuth();
-  const [tab, setTab] = useState('courses');
+  const [tab, setTab] = useState(localStorage.getItem('mk-learner-tab') || 'courses');
   const [courses, setCourses] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -50,12 +50,25 @@ const UserPortal = () => {
   const filteredCourses = courses.filter((course) =>
     `${course.title} ${course.description || ''}`.toLowerCase().includes(search.toLowerCase())
   );
+  const [activeVideoId, setActiveVideoId] = useState(null);
 
   useEffect(() => {
     const loadCourses = async () => {
       try {
         const data = await apiRequest('/user/courses');
-        setCourses(data.courses || []);
+        const nextCourses = data.courses || [];
+        setCourses(nextCourses);
+        const savedCourseId = Number(localStorage.getItem('mk-learner-course-id'));
+        if (savedCourseId) {
+          const savedCourse = nextCourses.find((item) => item.id === savedCourseId);
+          if (savedCourse) {
+            setSelectedCourse(savedCourse);
+            const firstModuleVideo = savedCourse.modules?.[0]?.videos?.[0];
+            const firstVideo = firstModuleVideo || savedCourse.videos?.[0] || null;
+            setSelectedVideo(firstVideo);
+            setActiveVideoId(firstVideo?.id || null);
+          }
+        }
       } catch (requestError) {
         setError(requestError.message);
       } finally {
@@ -69,6 +82,16 @@ const UserPortal = () => {
   useEffect(() => {
     localStorage.setItem('mk-theme', theme);
   }, [theme]);
+  useEffect(() => {
+    localStorage.setItem('mk-learner-tab', tab);
+  }, [tab]);
+  useEffect(() => {
+    if (selectedCourse?.id) {
+      localStorage.setItem('mk-learner-course-id', String(selectedCourse.id));
+    } else {
+      localStorage.removeItem('mk-learner-course-id');
+    }
+  }, [selectedCourse]);
 
   useEffect(() => {
     if (!status && !error) return undefined;
@@ -91,10 +114,13 @@ const UserPortal = () => {
           <h2>Learner Console</h2>
           <button type="button" className={tab === 'courses' ? 'nav-active' : ''} onClick={() => setTab('courses')}>Courses</button>
           <button type="button" className={tab === 'settings' ? 'nav-active' : ''} onClick={() => setTab('settings')}>Settings</button>
-          <button type="button" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>Theme: {theme}</button>
           <button type="button" className="secondary-button" onClick={handleLogout}>Logout</button>
         </aside>
         <main>
+          <div className="top-profile">
+            {auth?.user?.profileImage ? <img src={auth.user.profileImage} alt={auth.user.fullName || auth.user.username} className="top-avatar" /> : null}
+            <span>{auth?.user?.fullName || auth?.user?.username || 'Learner'}</span>
+          </div>
           <div className="page-actions">
             {tab === 'courses' ? (
               <div className="search-wrap">
@@ -134,7 +160,10 @@ const UserPortal = () => {
                         type="button"
                         onClick={() => {
                           setSelectedCourse(course);
-                          setSelectedVideo(course.videos?.[0] || null);
+                          const firstModuleVideo = course.modules?.[0]?.videos?.[0];
+                          const firstVideo = firstModuleVideo || course.videos?.[0] || null;
+                          setSelectedVideo(firstVideo);
+                          setActiveVideoId(firstVideo?.id || null);
                         }}
                       >
                         Open course
@@ -151,8 +180,18 @@ const UserPortal = () => {
                   <p>{selectedCourse.description || 'No description available.'}</p>
                   <div className="course-video-layout">
                     <div className="course-video-nav">
+                      {(selectedCourse.modules || []).map((moduleItem) => (
+                        <div key={moduleItem.id} className="module-block">
+                          <strong>{moduleItem.title}</strong>
+                          {(moduleItem.videos || []).map((video) => (
+                            <button type="button" key={video.id} className={`video-link ${activeVideoId === video.id ? 'video-active' : ''}`} onClick={() => { setSelectedVideo(video); setActiveVideoId(video.id); }}>
+                              {video.title}
+                            </button>
+                          ))}
+                        </div>
+                      ))}
                       {(selectedCourse.videos || []).map((video) => (
-                        <button type="button" key={video.id} className="video-link" onClick={() => setSelectedVideo(video)}>
+                        <button type="button" key={video.id} className={`video-link ${activeVideoId === video.id ? 'video-active' : ''}`} onClick={() => { setSelectedVideo(video); setActiveVideoId(video.id); }}>
                           {video.title}
                         </button>
                       ))}
@@ -180,11 +219,17 @@ const UserPortal = () => {
             <section className="portal-card">
               <h2>User Settings</h2>
               <form className="stack-form" onSubmit={(event) => event.preventDefault()}>
+                <label>Full Name</label>
                 <input type="text" value={settingsForm.fullName} onChange={(event) => setSettingsForm({ ...settingsForm, fullName: event.target.value })} placeholder="Full name" />
+                <label>Username</label>
                 <input type="text" value={settingsForm.username} onChange={(event) => setSettingsForm({ ...settingsForm, username: event.target.value })} placeholder="Username" />
+                <label>Email</label>
                 <input type="email" value={auth?.user?.email || ''} disabled />
+                <label>Profile Image</label>
                 <input type="file" accept="image/*" onChange={async (event) => { const file = event.target.files?.[0]; if (file) setSettingsForm({ ...settingsForm, profileImage: await fileToDataUrl(file) }); }} />
+                <label>Current Password</label>
                 <input type="password" value={settingsForm.currentPassword} onChange={(event) => setSettingsForm({ ...settingsForm, currentPassword: event.target.value })} placeholder="Current password" />
+                <label>New Password</label>
                 <input type="password" value={settingsForm.newPassword} onChange={(event) => setSettingsForm({ ...settingsForm, newPassword: event.target.value })} placeholder="New password" />
                 <button
                   type="button"

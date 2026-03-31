@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   db:
-    image: postgres:16
+    image: postgres:17
     container_name: mk-tech-postgres
     restart: unless-stopped
     environment:
@@ -37,6 +37,7 @@ services:
       PGPASSWORD: postgres
       MASTER_ADMIN_USERNAME: masteradmin
       MASTER_ADMIN_PASSWORD: admin123
+      MASTER_ADMIN_EMAIL: masteradmin@example.com
     ports:
       - '3000:3000'
     networks:

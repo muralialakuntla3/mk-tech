@@ -6,6 +6,7 @@ const config = {
   masterAdmin: {
     username: process.env.MASTER_ADMIN_USERNAME || '',
     password: process.env.MASTER_ADMIN_PASSWORD || '',
+    email: process.env.MASTER_ADMIN_EMAIL || '',
   },
   database: {
     connectionString: process.env.DATABASE_URL,

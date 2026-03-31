@@ -15,6 +15,8 @@ router.get('/courses', async (req, res, next) => {
           c.title AS course_title,
           c.description,
           c.image_url,
+          cm.id AS module_id,
+          cm.title AS module_title,
           cv.id AS video_id,
           cv.title AS video_title,
           cv.video_url,
@@ -22,8 +24,9 @@ router.get('/courses', async (req, res, next) => {
         FROM user_courses uc
         JOIN courses c ON c.id = uc.course_id
         LEFT JOIN course_videos cv ON cv.course_id = c.id
+        LEFT JOIN course_modules cm ON cm.id = cv.module_id
         WHERE uc.user_id = $1
-        ORDER BY c.title ASC, cv.id ASC
+        ORDER BY c.title ASC, cm.created_at DESC NULLS LAST, cv.created_at DESC, cv.id DESC
       `,
       [req.user.id]
     );
@@ -38,6 +41,7 @@ router.get('/courses', async (req, res, next) => {
           title: row.course_title,
           description: row.description,
           imageUrl: row.image_url || '',
+          modules: [],
           videos: [],
         };
 
@@ -46,12 +50,24 @@ router.get('/courses', async (req, res, next) => {
       }
 
       if (row.video_id) {
-        courseMap.get(row.course_id).videos.push({
+        const videoItem = {
           id: row.video_id,
           title: row.video_title,
           videoUrl: row.video_url,
+          moduleId: row.module_id,
           createdAt: row.video_created_at,
-        });
+        };
+        const course = courseMap.get(row.course_id);
+        if (row.module_id) {
+          let moduleEntry = course.modules.find((item) => item.id === row.module_id);
+          if (!moduleEntry) {
+            moduleEntry = { id: row.module_id, title: row.module_title, videos: [] };
+            course.modules.push(moduleEntry);
+          }
+          moduleEntry.videos.push(videoItem);
+        } else {
+          course.videos.push(videoItem);
+        }
       }
     }
 

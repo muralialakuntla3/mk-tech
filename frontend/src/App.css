@@ -1,4 +1,18 @@
 .app-shell {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+}
+
+.app-footer {
+  text-align: center;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  color: #5e6a84;
+  background: #f4f7ff;
 }
 

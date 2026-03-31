@@ -7,6 +7,15 @@ const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
+function isMasterAdminIdentity(user) {
+  const username = config.masterAdmin.username?.trim().toLowerCase();
+  const email = config.masterAdmin.email?.trim().toLowerCase();
+  if (!user || user.role !== 'admin') return false;
+  if (username && user.username?.toLowerCase() === username) return true;
+  if (email && user.email?.toLowerCase() === email) return true;
+  return false;
+}
+
 router.post('/login', async (req, res, next) => {
   try {
     const identifier = req.body.identifier?.trim() || req.body.username?.trim();
@@ -41,6 +50,7 @@ router.post('/login', async (req, res, next) => {
         id: user.id,
         username: user.username,
         role: user.role,
+        isMasterAdmin: isMasterAdminIdentity(user),
       },
       config.jwtSecret,
       { expiresIn: '12h' }
@@ -55,6 +65,7 @@ router.post('/login', async (req, res, next) => {
         profileImage: user.profile_image || '',
         fullName: user.full_name,
         role: user.role,
+        isMasterAdmin: isMasterAdminIdentity(user),
       },
     });
   } catch (error) {
@@ -87,6 +98,7 @@ router.get('/me', authenticate, async (req, res, next) => {
         profileImage: user.profile_image || '',
         fullName: user.full_name,
         role: user.role,
+        isMasterAdmin: isMasterAdminIdentity(user),
         createdAt: user.created_at,
       },
     });
@@ -137,6 +149,7 @@ router.put('/me', authenticate, async (req, res, next) => {
         profileImage: result.rows[0].profile_image || '',
         fullName: result.rows[0].full_name,
         role: result.rows[0].role,
+        isMasterAdmin: isMasterAdminIdentity(result.rows[0]),
       },
     });
   } catch (error) {
