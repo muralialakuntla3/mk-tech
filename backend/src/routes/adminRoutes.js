@@ -270,6 +270,30 @@ router.post('/courses/:courseId/videos', async (req, res, next) => {
   }
 });
 
+router.delete('/courses/:courseId/videos/:videoId', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const videoId = Number(req.params.videoId);
+
+    if (!Number.isInteger(courseId) || courseId <= 0 || !Number.isInteger(videoId) || videoId <= 0) {
+      return res.status(400).json({ message: 'Valid course and video IDs are required.' });
+    }
+
+    const result = await pool.query(
+      'DELETE FROM course_videos WHERE id = $1 AND course_id = $2 RETURNING id',
+      [videoId, courseId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Video not found.' });
+    }
+
+    return res.json({ message: 'Video deleted successfully.' });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/users', async (req, res, next) => {
   const client = await pool.connect();
 

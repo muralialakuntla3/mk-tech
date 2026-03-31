@@ -6,12 +6,32 @@ import './AdminPortal.css';
 const THEME_KEY = 'mk-theme';
 const emptyCourse = { title: '', description: '', imageUrl: '' };
 const emptyUser = { fullName: '', username: '', email: '', password: '', role: 'user', profileImage: '' };
+const getEmbedUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtube.com')) {
+      if (parsed.pathname.startsWith('/shorts/')) {
+        const id = parsed.pathname.split('/')[2];
+        if (id) return `https://www.youtube.com/embed/${id}`;
+      }
+      const videoId = parsed.searchParams.get('v');
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (parsed.hostname.includes('youtu.be')) {
+      const id = parsed.pathname.replace('/', '');
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    return url;
+  } catch {
+    return url;
+  }
+};
 
 const AdminPortal = () => {
   const navigate = useNavigate();
   const auth = getStoredAuth();
   const [theme, setTheme] = useState(localStorage.getItem(THEME_KEY) || 'light');
-  const [tab, setTab] = useState('learners');
+  const [tab, setTab] = useState('dashboard');
   const [courses, setCourses] = useState([]);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
@@ -21,6 +41,8 @@ const AdminPortal = () => {
   const [userForm, setUserForm] = useState(emptyUser);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [editingCourse, setEditingCourse] = useState(false);
+  const [editingUser, setEditingUser] = useState(false);
   const [courseLearners, setCourseLearners] = useState([]);
   const [learnerCourses, setLearnerCourses] = useState([]);
   const [selectedLearnersToEnroll, setSelectedLearnersToEnroll] = useState([]);
@@ -57,9 +79,19 @@ const AdminPortal = () => {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (!status && !error) return undefined;
+    const timer = setTimeout(() => {
+      setStatus('');
+      setError('');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [status, error]);
+
   const openCourse = async (course) => {
     setSelectedCourse(course);
     setSelectedUser(null);
+    setEditingCourse(false);
     setCourseForm({ title: course.title, description: course.description || '', imageUrl: course.imageUrl || '' });
     const data = await apiRequest(`/admin/courses/${course.id}/learners`);
     setCourseLearners(data.learners || []);
@@ -69,6 +101,7 @@ const AdminPortal = () => {
   const openUser = async (user) => {
     setSelectedUser(user);
     setSelectedCourse(null);
+    setEditingUser(false);
     setUserForm({
       fullName: user.fullName,
       username: user.username,
@@ -207,20 +240,56 @@ const AdminPortal = () => {
     }
   };
 
+  const topSearchList = tab === 'courses' ? filteredCourses : filteredUsers;
+  const learnerCount = users.filter((item) => item.role === 'user').length;
+  const adminCount = users.filter((item) => item.role === 'admin').length;
+  const videoCount = courses.reduce((sum, course) => sum + (course.videos?.length || 0), 0);
+  const maxCount = Math.max(courses.length, learnerCount, adminCount, videoCount, 1);
+
   return (
     <div className={`portal-shell theme-${theme}`}>
       <div className="console-layout">
         <aside className="left-nav">
           <h2>Admin Console</h2>
+          <button type="button" className={tab === 'dashboard' ? 'nav-active' : ''} onClick={() => { setTab('dashboard'); setSelectedCourse(null); setSelectedUser(null); }}>Dashboard</button>
           <button type="button" className={tab === 'learners' ? 'nav-active' : ''} onClick={() => { setTab('learners'); setSearch(''); setSelectedUser(null); }}>Learner Management</button>
           <button type="button" className={tab === 'courses' ? 'nav-active' : ''} onClick={() => { setTab('courses'); setSearch(''); setSelectedCourse(null); }}>Course Management</button>
           <button type="button" className={tab === 'settings' ? 'nav-active' : ''} onClick={() => setTab('settings')}>Settings</button>
-          <button type="button" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>Theme: {theme}</button>
           <button type="button" className="secondary-button" onClick={() => { clearStoredAuth(); navigate('/'); }}>Logout</button>
         </aside>
         <main>
+          <div className="page-actions">
+            {(tab === 'courses' || tab === 'learners') ? (
+              <div className="search-wrap">
+                <span>🔍</span>
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${tab}...`} />
+              </div>
+            ) : <div />}
+            <button type="button" className="icon-button" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>🌙</button>
+          </div>
           {status ? <div className="status-banner success-banner">{status}</div> : null}
           {error ? <div className="status-banner error-banner">{error}</div> : null}
+
+          {tab === 'dashboard' ? (
+            <section className="portal-card">
+              <h2>Admin Dashboard</h2>
+              <div className="dashboard-stats">
+                <div className="stat-card"><strong>{courses.length}</strong><span>Courses</span></div>
+                <div className="stat-card"><strong>{learnerCount}</strong><span>Learners</span></div>
+                <div className="stat-card"><strong>{adminCount}</strong><span>Admins</span></div>
+                <div className="stat-card"><strong>{videoCount}</strong><span>Videos</span></div>
+              </div>
+              <div className="bar-chart">
+                {[{ label: 'Courses', value: courses.length }, { label: 'Learners', value: learnerCount }, { label: 'Admins', value: adminCount }, { label: 'Videos', value: videoCount }].map((item) => (
+                  <div key={item.label} className="bar-item">
+                    <span>{item.label}</span>
+                    <div className="bar-track"><div className="bar-fill" style={{ width: `${(item.value / maxCount) * 100}%` }} /></div>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {tab === 'courses' ? (
             <>
@@ -233,7 +302,6 @@ const AdminPortal = () => {
                     <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setCourseForm({ ...courseForm, imageUrl: await fileToDataUrl(file) }); }} required />
                     <button type="submit">Create Course</button>
                   </form>
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search courses..." />
                   <table className="data-table">
                     <thead><tr><th>Title</th><th>Description</th><th>Videos</th></tr></thead>
                     <tbody>
@@ -249,16 +317,33 @@ const AdminPortal = () => {
                 <section className="portal-card">
                   <div className="section-title-row">
                     <h2>{selectedCourse.title}</h2>
-                    <button type="button" onClick={() => setSelectedCourse(null)}>Back</button>
+                    <div className="inline-form">
+                      <button type="button" onClick={() => setEditingCourse((current) => !current)}>📌 Edit</button>
+                      <button type="button" onClick={async () => { await apiRequest(`/admin/courses/${selectedCourse.id}`, { method: 'DELETE' }); setSelectedCourse(null); await loadDashboard(); setStatus('Course deleted.'); }}>Delete Course</button>
+                      <button type="button" onClick={() => setSelectedCourse(null)}>Back</button>
+                    </div>
                   </div>
                   <form className="stack-form" onSubmit={(e) => e.preventDefault()}>
-                    <input value={courseForm.title} onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })} required />
-                    <textarea value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} />
-                    <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setCourseForm({ ...courseForm, imageUrl: await fileToDataUrl(file) }); }} />
-                    <button type="button" onClick={handleUpdateCourse}>Update Course</button>
+                    <label>Course Title</label>
+                    <input value={courseForm.title} onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })} required disabled={!editingCourse} />
+                    <label>Description</label>
+                    <textarea value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} disabled={!editingCourse} />
+                    <label>Course Image</label>
+                    <input type="file" accept="image/*" disabled={!editingCourse} onChange={async (e) => { const file = e.target.files?.[0]; if (file) setCourseForm({ ...courseForm, imageUrl: await fileToDataUrl(file) }); }} />
+                    {editingCourse ? <button type="button" onClick={handleUpdateCourse}>Update Course</button> : null}
                   </form>
                   <h3>Course Videos</h3>
-                  <div className="video-list">{(selectedCourse.videos || []).map((v) => <div key={v.id} className="video-link">{v.title}</div>)}</div>
+                  <div className="video-list">
+                    {(selectedCourse.videos || []).map((v) => (
+                      <div key={v.id} className="video-row">
+                        <span className="video-link">{v.title}</span>
+                        <button type="button" onClick={async () => { await apiRequest(`/admin/courses/${selectedCourse.id}/videos/${v.id}`, { method: 'DELETE' }); await openCourse(selectedCourse); await loadDashboard(); setStatus('Video deleted.'); }}>Delete</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="video-player-shell">
+                    {selectedCourse.videos?.[0] ? <iframe title={selectedCourse.videos[0].title} src={getEmbedUrl(selectedCourse.videos[0].videoUrl)} className="video-frame" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen /> : null}
+                  </div>
                   <div className="inline-form">
                     <input value={videoForm.title} onChange={(e) => setVideoForm({ ...videoForm, title: e.target.value })} placeholder="Video title" />
                     <input value={videoForm.videoUrl} onChange={(e) => setVideoForm({ ...videoForm, videoUrl: e.target.value })} placeholder="Video URL" />
@@ -294,20 +379,32 @@ const AdminPortal = () => {
                     <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setUserForm({ ...userForm, profileImage: await fileToDataUrl(file) }); }} required={userForm.role === 'user'} />
                     <button type="submit">Create User</button>
                   </form>
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search learners/admins..." />
                   <table className="data-table"><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th></tr></thead><tbody>{filteredUsers.map((item) => <tr key={item.id} onClick={() => openUser(item)}><td>{item.fullName}</td><td>{item.username}</td><td>{item.email}</td><td>{item.role}</td></tr>)}</tbody></table>
                 </section>
               ) : (
                 <section className="portal-card">
-                  <div className="section-title-row"><h2>{selectedUser.fullName}</h2><button type="button" onClick={() => setSelectedUser(null)}>Back</button></div>
+                  <div className="section-title-row">
+                    <h2>{selectedUser.fullName}</h2>
+                    <div className="inline-form">
+                      <button type="button" onClick={() => setEditingUser((current) => !current)}>📌 Edit</button>
+                      <button type="button" onClick={async () => { await apiRequest(`/admin/users/${selectedUser.id}`, { method: 'DELETE' }); setSelectedUser(null); await loadDashboard(); setStatus('User deleted.'); }}>Delete User</button>
+                      <button type="button" onClick={() => setSelectedUser(null)}>Back</button>
+                    </div>
+                  </div>
                   <form className="stack-form" onSubmit={(e) => e.preventDefault()}>
-                    <input value={userForm.fullName} onChange={(e) => setUserForm({ ...userForm, fullName: e.target.value })} />
-                    <input value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} />
-                    <input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
-                    <input type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Optional new password" />
-                    <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}><option value="user">Learner</option><option value="admin">Admin</option></select>
-                    <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setUserForm({ ...userForm, profileImage: await fileToDataUrl(file) }); }} />
-                    <button type="button" onClick={handleUpdateUser}>Update User</button>
+                    <label>Full Name</label>
+                    <input value={userForm.fullName} onChange={(e) => setUserForm({ ...userForm, fullName: e.target.value })} disabled={!editingUser} />
+                    <label>Username</label>
+                    <input value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} disabled={!editingUser} />
+                    <label>Email</label>
+                    <input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} disabled={!editingUser} />
+                    <label>Password</label>
+                    <input type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="Optional new password" disabled={!editingUser} />
+                    <label>Role</label>
+                    <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} disabled={!editingUser}><option value="user">Learner</option><option value="admin">Admin</option></select>
+                    <label>Profile Image</label>
+                    <input type="file" accept="image/*" disabled={!editingUser} onChange={async (e) => { const file = e.target.files?.[0]; if (file) setUserForm({ ...userForm, profileImage: await fileToDataUrl(file) }); }} />
+                    {editingUser ? <button type="button" onClick={handleUpdateUser}>Update User</button> : null}
                   </form>
                   {selectedUser.role === 'user' ? (
                     <>

@@ -35,6 +35,8 @@ services:
       PGDATABASE: mk_tech
       PGUSER: postgres
       PGPASSWORD: postgres
+      MASTER_ADMIN_USERNAME: masteradmin
+      MASTER_ADMIN_PASSWORD: admin123
     ports:
       - '3000:3000'
     networks:

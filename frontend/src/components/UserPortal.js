@@ -7,6 +7,10 @@ const getEmbedUrl = (url) => {
   try {
     const parsed = new URL(url);
     if (parsed.hostname.includes('youtube.com')) {
+      if (parsed.pathname.startsWith('/shorts/')) {
+        const id = parsed.pathname.split('/')[2];
+        if (id) return `https://www.youtube.com/embed/${id}`;
+      }
       const videoId = parsed.searchParams.get('v');
       if (videoId) {
         return `https://www.youtube.com/embed/${videoId}`;
@@ -29,6 +33,7 @@ const UserPortal = () => {
   const auth = getStoredAuth();
   const [tab, setTab] = useState('courses');
   const [courses, setCourses] = useState([]);
+  const [search, setSearch] = useState('');
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem('mk-theme') || 'light');
@@ -42,6 +47,9 @@ const UserPortal = () => {
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const filteredCourses = courses.filter((course) =>
+    `${course.title} ${course.description || ''}`.toLowerCase().includes(search.toLowerCase())
+  );
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -62,6 +70,15 @@ const UserPortal = () => {
     localStorage.setItem('mk-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (!status && !error) return undefined;
+    const timer = setTimeout(() => {
+      setStatus('');
+      setError('');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [status, error]);
+
   const handleLogout = () => {
     clearStoredAuth();
     navigate('/');
@@ -78,6 +95,15 @@ const UserPortal = () => {
           <button type="button" className="secondary-button" onClick={handleLogout}>Logout</button>
         </aside>
         <main>
+          <div className="page-actions">
+            {tab === 'courses' ? (
+              <div className="search-wrap">
+                <span>🔍</span>
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search courses..." />
+              </div>
+            ) : <div />}
+            <button type="button" className="icon-button" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>🌙</button>
+          </div>
           <div className="portal-topbar">
             <div>
               <p className="portal-tag">Learner workspace</p>
@@ -98,7 +124,7 @@ const UserPortal = () => {
 
               {!selectedCourse ? (
                 <div className="course-list-grid">
-                  {courses.map((course) => (
+                  {filteredCourses.map((course) => (
                     <section className="portal-card" key={course.id}>
                       {course.imageUrl ? <img src={course.imageUrl} alt={course.title} className="course-image" /> : null}
                       <h2>{course.title}</h2>

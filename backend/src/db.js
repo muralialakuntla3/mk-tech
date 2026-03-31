@@ -79,23 +79,30 @@ async function initDatabase() {
       )
     `);
 
-    const adminCheck = await client.query(
-      'SELECT id FROM users WHERE username = $1',
-      ['admin']
-    );
+    const masterUsername = config.masterAdmin.username?.trim().toLowerCase();
+    const masterPassword = config.masterAdmin.password?.trim();
 
-    if (!adminCheck.rowCount) {
-      const passwordHash = await bcrypt.hash('admin', 10);
-
-      await client.query(
-        `
-          INSERT INTO users (username, password_hash, full_name, role)
-          VALUES ($1, $2, $3, $4)
-        `,
-        ['admin', passwordHash, 'Default Admin', 'admin']
+    if (masterUsername && masterPassword) {
+      const adminCheck = await client.query(
+        'SELECT id FROM users WHERE username = $1',
+        [masterUsername]
       );
 
-      console.log('Default admin created with username "admin" and password "admin".');
+      if (!adminCheck.rowCount) {
+        const passwordHash = await bcrypt.hash(masterPassword, 10);
+
+        await client.query(
+          `
+            INSERT INTO users (username, password_hash, full_name, role)
+            VALUES ($1, $2, $3, $4)
+          `,
+          [masterUsername, passwordHash, 'Master Admin', 'admin']
+        );
+
+        console.log(`Master admin created with username "${masterUsername}".`);
+      }
+    } else {
+      console.log('MASTER_ADMIN_USERNAME or MASTER_ADMIN_PASSWORD not set. Skipping default admin creation.');
     }
 
     await client.query('COMMIT');
