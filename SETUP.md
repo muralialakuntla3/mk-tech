@@ -29,7 +29,7 @@ npm install
 npm start
 ```
 
-The backend API runs at `http://localhost:4000/api`.
+The backend API runs at `http://localhost:3000/api`.
 
 ## Frontend Setup
 

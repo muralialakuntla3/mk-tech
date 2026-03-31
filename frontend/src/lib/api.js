@@ -1,4 +1,4 @@
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
+const API_BASE_URL = (process.env.REACT_APP_API_URL).replace(/\/$/, '');
 export const AUTH_STORAGE_KEY = 'mk-tech-auth';
 
 export function getStoredAuth() {

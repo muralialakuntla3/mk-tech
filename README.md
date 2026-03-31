@@ -108,8 +108,8 @@ npm start
 
 The React dev server runs on `http://localhost:3000` by default.  
 If you are running the backend on the same port, ensure the frontend is configured to call `REACT_APP_API_URL=http://localhost:3000/api` and that you don’t run two dev servers on port 3000 simultaneously. For a clean separation during manual dev you can:
-- run backend on `PORT=4000` (by temporarily changing `.env`) and
-- set `REACT_APP_API_URL=http://localhost:4000/api`.
+- run backend on `PORT=3000` (by temporarily changing `.env`) and
+- set `REACT_APP_API_URL=http://localhost:3000/api`.
 
 ---
 

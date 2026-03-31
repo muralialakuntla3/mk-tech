@@ -11,6 +11,12 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - mk-tech-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mk_tech"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     networks:
       - mk-tech-net
 
@@ -19,7 +25,8 @@ services:
       context: ./backend
     container_name: mk-tech-backend
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       PORT: 3000
       DATABASE_URL: postgres://postgres:postgres@db:5432/mk_tech
@@ -42,7 +49,7 @@ services:
     environment:
       REACT_APP_API_URL: http://backend:3000/api
     ports:
-      - '8080:80'
+      - '80:80'
     networks:
       - mk-tech-net
 
