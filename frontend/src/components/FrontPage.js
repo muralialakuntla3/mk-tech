@@ -5,8 +5,9 @@ import './FrontPage.css';
 
 const FrontPage = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,7 +27,7 @@ const FrontPage = () => {
     try {
       const response = await apiRequest('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       saveStoredAuth(response);
@@ -49,25 +50,30 @@ const FrontPage = () => {
 
         <div className="login-card">
           <form className="login-form" onSubmit={handleLogin}>
-            <label htmlFor="username">Username</label>
+            <label htmlFor="identifier">Username or Email</label>
             <input
-              id="username"
+              id="identifier"
               type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="Enter your username"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder="Enter your username or email"
               required
             />
 
             <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter your password"
-              required
-            />
+            <div className="password-field">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                required
+              />
+              <button type="button" className="password-toggle" onClick={() => setShowPassword((current) => !current)}>
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
 
             {error ? <div className="form-message error-message">{error}</div> : null}
 
@@ -78,16 +84,7 @@ const FrontPage = () => {
         </div>
       </div>
 
-      <div className="login-right">
-        <div className="hero-panel">
-          <h2>Platform Features</h2>
-          <ul className="feature-list">
-            <li>Manage tech courses</li>
-            <li>User onboarding and course registration</li>
-            <li>Learner view for assigned course videos</li>
-          </ul>
-        </div>
-      </div>
+      <div className="login-right" aria-hidden="true" />
     </div>
   );
 };

@@ -27,6 +27,7 @@ async function initDatabase() {
         id SERIAL PRIMARY KEY,
         username VARCHAR(80) UNIQUE NOT NULL,
         email VARCHAR(160) UNIQUE,
+        profile_image TEXT,
         password_hash TEXT NOT NULL,
         full_name VARCHAR(120) NOT NULL,
         role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'user')),
@@ -50,6 +51,11 @@ async function initDatabase() {
     `);
 
     await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS profile_image TEXT
+    `);
+
+    await client.query(`
       ALTER TABLE courses
       ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''
     `);
@@ -65,6 +71,20 @@ async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS course_modules (
+        id SERIAL PRIMARY KEY,
+        course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        title VARCHAR(150) NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      ALTER TABLE course_videos
+      ADD COLUMN IF NOT EXISTS module_id INTEGER REFERENCES course_modules(id) ON DELETE SET NULL
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS user_courses (
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -73,23 +93,31 @@ async function initDatabase() {
       )
     `);
 
-    const adminCheck = await client.query(
-      'SELECT id FROM users WHERE username = $1',
-      ['admin']
-    );
+    const masterUsername = config.masterAdmin.username?.trim().toLowerCase();
+    const masterPassword = config.masterAdmin.password?.trim();
+    const masterEmail = config.masterAdmin.email?.trim().toLowerCase() || null;
 
-    if (!adminCheck.rowCount) {
-      const passwordHash = await bcrypt.hash('admin', 10);
-
-      await client.query(
-        `
-          INSERT INTO users (username, password_hash, full_name, role)
-          VALUES ($1, $2, $3, $4)
-        `,
-        ['admin', passwordHash, 'Default Admin', 'admin']
+    if (masterUsername && masterPassword) {
+      const adminCheck = await client.query(
+        'SELECT id FROM users WHERE username = $1',
+        [masterUsername]
       );
 
-      console.log('Default admin created with username "admin" and password "admin".');
+      if (!adminCheck.rowCount) {
+        const passwordHash = await bcrypt.hash(masterPassword, 10);
+
+        await client.query(
+          `
+            INSERT INTO users (username, email, password_hash, full_name, role)
+            VALUES ($1, $2, $3, $4, $5)
+          `,
+          [masterUsername, masterEmail, passwordHash, 'Master Admin', 'admin']
+        );
+
+        console.log(`Master admin created with username "${masterUsername}".`);
+      }
+    } else {
+      console.log('MASTER_ADMIN_USERNAME or MASTER_ADMIN_PASSWORD not set. Skipping default admin creation.');
     }
 
     await client.query('COMMIT');

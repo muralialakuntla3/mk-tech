@@ -8,7 +8,8 @@ const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

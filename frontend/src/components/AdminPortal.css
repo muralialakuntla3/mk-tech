@@ -2,6 +2,7 @@
   min-height: 100vh;
   padding: 32px 20px 40px;
   background: linear-gradient(180deg, #f5f8ff 0%, #eef3fb 100%);
+  color: #111827;
 }
 
 .console-layout {
@@ -26,6 +27,8 @@
   border: 1px solid #d7deeb;
   background: #f6f9ff;
   color: #1f2a44;
+  border-radius: 999px;
+  transition: all 0.2s ease;
 }
 
 .left-nav .nav-active {
@@ -68,10 +71,59 @@
   color: #ffffff;
   cursor: pointer;
   font-weight: 700;
+  transition: transform 0.12s ease, filter 0.2s ease;
 }
 
 .secondary-button {
   background: #20304d;
+  border-radius: 999px;
+}
+
+.portal-card button:hover,
+.left-nav button:hover,
+.secondary-button:hover {
+  filter: brightness(1.05);
+}
+
+.portal-card button:active,
+.left-nav button:active,
+.secondary-button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.page-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.search-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #d7deeb;
+  border-radius: 999px;
+  padding: 8px 12px;
+  min-width: 280px;
+}
+
+.search-wrap input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
 }
 
 .status-banner {
@@ -131,6 +183,7 @@
   border: 1px solid #d7deeb;
   border-radius: 10px;
   background: #fbfcff;
+  color: #111827;
 }
 
 .stack-form textarea {
@@ -210,6 +263,10 @@
   cursor: pointer;
 }
 
+.video-active {
+  background: #d6e2ff;
+}
+
 .video-link:hover {
   background: #dfe7ff;
 }
@@ -251,6 +308,22 @@
   margin: 12px 0 16px;
 }
 
+.course-video-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+}
+
+.course-video-nav {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.course-video-player {
+  min-width: 0;
+}
+
 .video-frame {
   width: 100%;
   min-height: 420px;
@@ -259,9 +332,89 @@
   background: #000;
 }
 
+.video-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #dfe5f2;
+}
+
+.table-thumb {
+  width: 52px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.data-table tbody tr {
+  cursor: pointer;
+}
+
+.data-table tbody tr:hover {
+  background: #f4f8ff;
+}
+
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  padding: 14px;
+  border-radius: 12px;
+  background: #f6f9ff;
+  border: 1px solid #dde6fa;
+  display: grid;
+  gap: 4px;
+}
+
+.stat-card strong {
+  font-size: 1.4rem;
+}
+
+.bar-chart {
+  display: grid;
+  gap: 10px;
+}
+
+.bar-item {
+  display: grid;
+  grid-template-columns: 90px 1fr 40px;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: #dbe5ff;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #2e55ff;
+}
+
 .theme-dark {
   background: linear-gradient(180deg, #141824 0%, #0f1320 100%);
-  color: #e9eefc;
+  color: #ffffff;
 }
 
 .theme-dark .portal-card,
@@ -280,7 +433,7 @@
 .theme-dark .portal-subtitle,
 .theme-dark .muted-text,
 .theme-dark .user-summary p {
-  color: #c0c9dc;
+  color: #ffffff;
 }
 
 .theme-dark .stack-form input,
@@ -289,7 +442,7 @@
 .theme-dark .stack-form select {
   background: #101827;
   border-color: #31415f;
-  color: #e9eefc;
+  color: #ffffff;
 }
 
 .theme-dark .course-card-panel,
@@ -297,6 +450,38 @@
 .theme-dark .empty-state {
   background: #11192a;
   border-color: #2b3a57;
+}
+
+.theme-dark .search-wrap {
+  background: #1a2236;
+  border-color: #31415f;
+}
+
+.theme-dark .search-wrap input {
+  color: #ffffff;
+}
+
+.top-profile {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.top-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.module-block {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #eef3ff;
 }
 
 @media (max-width: 900px) {
@@ -312,6 +497,14 @@
 
   .admin-layout {
     grid-template-columns: 1fr;
+  }
+
+  .course-video-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

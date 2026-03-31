@@ -1,11 +1,23 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../db');
+const config = require('../config');
 const { authenticate, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
 router.use(authenticate, requireRole('admin'));
+
+async function isMasterAdminUser(userId, client = pool) {
+  const result = await client.query('SELECT username, email, role FROM users WHERE id = $1', [userId]);
+  if (!result.rowCount || result.rows[0].role !== 'admin') {
+    return false;
+  }
+  const masterUsername = config.masterAdmin.username?.trim().toLowerCase();
+  const masterEmail = config.masterAdmin.email?.trim().toLowerCase();
+  return (masterUsername && result.rows[0].username?.toLowerCase() === masterUsername)
+    || (masterEmail && result.rows[0].email?.toLowerCase() === masterEmail);
+}
 
 function normalizeCourseIds(value) {
   return [...new Set(
@@ -48,10 +60,11 @@ async function getDashboardData() {
             json_build_object(
               'id', cv.id,
               'title', cv.title,
+              'moduleId', cv.module_id,
               'videoUrl', cv.video_url,
               'createdAt', cv.created_at
             )
-            ORDER BY cv.id
+            ORDER BY cv.created_at DESC, cv.id DESC
           ) FILTER (WHERE cv.id IS NOT NULL),
           '[]'::json
         ) AS videos
@@ -65,6 +78,7 @@ async function getDashboardData() {
         u.id,
         u.username,
         u.email,
+        u.profile_image,
         u.full_name,
         u.role,
         u.created_at,
@@ -81,7 +95,6 @@ async function getDashboardData() {
       FROM users u
       LEFT JOIN user_courses uc ON uc.user_id = u.id
       LEFT JOIN courses c ON c.id = uc.course_id
-      WHERE u.role = 'user'
       GROUP BY u.id
       ORDER BY u.created_at DESC, u.id DESC
     `),
@@ -100,8 +113,14 @@ async function getDashboardData() {
       id: user.id,
       username: user.username,
       email: user.email,
+      profileImage: user.profile_image || '',
       fullName: user.full_name,
       role: user.role,
+      isMasterAdmin:
+        user.role === 'admin' && (
+          (config.masterAdmin.username?.trim().toLowerCase() && user.username?.toLowerCase() === config.masterAdmin.username.trim().toLowerCase())
+          || (config.masterAdmin.email?.trim().toLowerCase() && user.email?.toLowerCase() === config.masterAdmin.email.trim().toLowerCase())
+        ),
       createdAt: user.created_at,
       courses: Array.isArray(user.courses) ? user.courses : [],
     })),
@@ -123,8 +142,8 @@ router.post('/courses', async (req, res, next) => {
     const description = req.body.description?.trim() || '';
     const imageUrl = req.body.imageUrl?.trim() || '';
 
-    if (!title) {
-      return res.status(400).json({ message: 'Course title is required.' });
+    if (!title || !imageUrl) {
+      return res.status(400).json({ message: 'Course title and image are required.' });
     }
 
     const result = await pool.query(
@@ -167,8 +186,8 @@ router.put('/courses/:courseId', async (req, res, next) => {
       return res.status(400).json({ message: 'A valid course ID is required.' });
     }
 
-    if (!title) {
-      return res.status(400).json({ message: 'Course title is required.' });
+    if (!title || !imageUrl) {
+      return res.status(400).json({ message: 'Course title and image are required.' });
     }
 
     const result = await pool.query(
@@ -227,6 +246,8 @@ router.post('/courses/:courseId/videos', async (req, res, next) => {
     const courseId = Number(req.params.courseId);
     const title = req.body.title?.trim();
     const videoUrl = req.body.videoUrl?.trim();
+    const parsedModuleId = Number(req.body.moduleId);
+    const moduleId = Number.isInteger(parsedModuleId) && parsedModuleId > 0 ? parsedModuleId : null;
 
     if (!Number.isInteger(courseId) || courseId <= 0) {
       return res.status(400).json({ message: 'A valid course ID is required.' });
@@ -247,11 +268,11 @@ router.post('/courses/:courseId/videos', async (req, res, next) => {
 
     const result = await pool.query(
       `
-        INSERT INTO course_videos (course_id, title, video_url)
-        VALUES ($1, $2, $3)
-        RETURNING id, course_id, title, video_url, created_at
+        INSERT INTO course_videos (course_id, module_id, title, video_url)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, course_id, module_id, title, video_url, created_at
       `,
-      [courseId, title, videoUrl]
+      [courseId, moduleId, title, videoUrl]
     );
 
     return res.status(201).json({
@@ -259,11 +280,136 @@ router.post('/courses/:courseId/videos', async (req, res, next) => {
       video: {
         id: result.rows[0].id,
         courseId: result.rows[0].course_id,
+        moduleId: result.rows[0].module_id,
         title: result.rows[0].title,
         videoUrl: result.rows[0].video_url,
         createdAt: result.rows[0].created_at,
       },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put('/courses/:courseId/videos/:videoId', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const videoId = Number(req.params.videoId);
+    const title = req.body.title?.trim();
+    const videoUrl = req.body.videoUrl?.trim();
+    const parsedModuleId = Number(req.body.moduleId);
+    const moduleId = Number.isInteger(parsedModuleId) && parsedModuleId > 0 ? parsedModuleId : null;
+
+    if (!Number.isInteger(courseId) || courseId <= 0 || !Number.isInteger(videoId) || videoId <= 0) {
+      return res.status(400).json({ message: 'Valid course and video IDs are required.' });
+    }
+    if (!title || !videoUrl) {
+      return res.status(400).json({ message: 'Video title and video link are required.' });
+    }
+
+    const result = await pool.query(
+      `
+        UPDATE course_videos
+        SET title = $1, video_url = $2, module_id = $3
+        WHERE id = $4 AND course_id = $5
+        RETURNING id, course_id, module_id, title, video_url, created_at
+      `,
+      [title, videoUrl, moduleId, videoId, courseId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Video not found.' });
+    }
+
+    return res.json({
+      message: 'Video updated successfully.',
+      video: {
+        id: result.rows[0].id,
+        courseId: result.rows[0].course_id,
+        moduleId: result.rows[0].module_id,
+        title: result.rows[0].title,
+        videoUrl: result.rows[0].video_url,
+        createdAt: result.rows[0].created_at,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/courses/:courseId/modules', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    if (!Number.isInteger(courseId) || courseId <= 0) {
+      return res.status(400).json({ message: 'A valid course ID is required.' });
+    }
+    const result = await pool.query(
+      'SELECT id, title, created_at FROM course_modules WHERE course_id = $1 ORDER BY created_at DESC, id DESC',
+      [courseId]
+    );
+    return res.json({
+      modules: result.rows.map((moduleItem) => ({
+        id: moduleItem.id,
+        title: moduleItem.title,
+        createdAt: moduleItem.created_at,
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/courses/:courseId/modules', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const title = req.body.title?.trim();
+    if (!Number.isInteger(courseId) || courseId <= 0) {
+      return res.status(400).json({ message: 'A valid course ID is required.' });
+    }
+    if (!title) {
+      return res.status(400).json({ message: 'Module title is required.' });
+    }
+    const result = await pool.query(
+      `
+        INSERT INTO course_modules (course_id, title)
+        VALUES ($1, $2)
+        RETURNING id, course_id, title, created_at
+      `,
+      [courseId, title]
+    );
+    return res.status(201).json({
+      message: 'Module created successfully.',
+      module: {
+        id: result.rows[0].id,
+        courseId: result.rows[0].course_id,
+        title: result.rows[0].title,
+        createdAt: result.rows[0].created_at,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete('/courses/:courseId/videos/:videoId', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const videoId = Number(req.params.videoId);
+
+    if (!Number.isInteger(courseId) || courseId <= 0 || !Number.isInteger(videoId) || videoId <= 0) {
+      return res.status(400).json({ message: 'Valid course and video IDs are required.' });
+    }
+
+    const result = await pool.query(
+      'DELETE FROM course_videos WHERE id = $1 AND course_id = $2 RETURNING id',
+      [videoId, courseId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Video not found.' });
+    }
+
+    return res.json({ message: 'Video deleted successfully.' });
   } catch (error) {
     return next(error);
   }
@@ -278,10 +424,15 @@ router.post('/users', async (req, res, next) => {
     const fullName = req.body.fullName?.trim();
     const email = req.body.email?.trim().toLowerCase();
     const role = req.body.role === 'admin' ? 'admin' : 'user';
+    const profileImage = req.body.profileImage?.trim() || '';
     const assignedCourseIds = normalizeCourseIds(req.body.assignedCourseIds);
 
     if (!username || !password || !fullName || !email) {
       return res.status(400).json({ message: 'Full name, username, email, and password are required.' });
+    }
+
+    if (role === 'user' && !profileImage) {
+      return res.status(400).json({ message: 'Learner profile image is required.' });
     }
 
     await client.query('BEGIN');
@@ -290,11 +441,11 @@ router.post('/users', async (req, res, next) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const userResult = await client.query(
       `
-        INSERT INTO users (username, password_hash, full_name, role, email)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, username, email, full_name, role, created_at
+        INSERT INTO users (username, password_hash, full_name, role, email, profile_image)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, username, email, profile_image, full_name, role, created_at
       `,
-      [username, passwordHash, fullName, role, email]
+      [username, passwordHash, fullName, role, email, profileImage || null]
     );
 
     const user = userResult.rows[0];
@@ -325,6 +476,7 @@ router.post('/users', async (req, res, next) => {
         id: user.id,
         username: user.username,
         email: user.email,
+        profileImage: user.profile_image || '',
         fullName: user.full_name,
         role: user.role,
         createdAt: user.created_at,
@@ -351,22 +503,35 @@ router.put('/users/:userId', async (req, res, next) => {
     const fullName = req.body.fullName?.trim();
     const email = req.body.email?.trim().toLowerCase();
     const role = req.body.role === 'admin' ? 'admin' : 'user';
+    const profileImage = req.body.profileImage?.trim() || '';
+    const password = req.body.password?.trim() || '';
 
     if (!Number.isInteger(userId) || userId <= 0) {
       return res.status(400).json({ message: 'A valid user ID is required.' });
     }
+    if (await isMasterAdminUser(userId)) {
+      return res.status(403).json({ message: 'Master admin role/profile cannot be modified.' });
+    }
     if (!username || !fullName || !email) {
       return res.status(400).json({ message: 'Full name, username, and email are required.' });
     }
+    if (role === 'user' && !profileImage) {
+      return res.status(400).json({ message: 'Learner profile image is required.' });
+    }
+
+    const passwordClause = password ? ', password_hash = $6' : '';
+    const queryParams = password
+      ? [username, fullName, email, role, userId, await bcrypt.hash(password, 10), profileImage || null]
+      : [username, fullName, email, role, userId, profileImage || null];
 
     const result = await pool.query(
       `
         UPDATE users
-        SET username = $1, full_name = $2, email = $3, role = $4
+        SET username = $1, full_name = $2, email = $3, role = $4${passwordClause}, profile_image = $${password ? 7 : 6}
         WHERE id = $5
-        RETURNING id, username, full_name, email, role, created_at
+        RETURNING id, username, full_name, email, profile_image, role, created_at
       `,
-      [username, fullName, email, role, userId]
+      queryParams
     );
 
     if (!result.rowCount) {
@@ -380,6 +545,7 @@ router.put('/users/:userId', async (req, res, next) => {
         username: result.rows[0].username,
         fullName: result.rows[0].full_name,
         email: result.rows[0].email,
+        profileImage: result.rows[0].profile_image || '',
         role: result.rows[0].role,
         createdAt: result.rows[0].created_at,
       },
@@ -397,6 +563,9 @@ router.delete('/users/:userId', async (req, res, next) => {
     const userId = Number(req.params.userId);
     if (!Number.isInteger(userId) || userId <= 0) {
       return res.status(400).json({ message: 'A valid user ID is required.' });
+    }
+    if (await isMasterAdminUser(userId)) {
+      return res.status(403).json({ message: 'Master admin cannot be deleted.' });
     }
 
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);

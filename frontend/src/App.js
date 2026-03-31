@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
 import FrontPage from './components/FrontPage';
 import AdminPortal from './components/AdminPortal';
@@ -24,26 +24,29 @@ function App() {
   return (
     <div className="app-shell">
       <Router>
-        <Routes>
-          <Route path="/" element={<FrontPage />} />
-          <Route
-            path="/admin"
-            element={(
-              <ProtectedRoute allowedRole="admin">
-                <AdminPortal />
-              </ProtectedRoute>
-            )}
-          />
-          <Route
-            path="/learning"
-            element={(
-              <ProtectedRoute allowedRole="user">
-                <UserPortal />
-              </ProtectedRoute>
-            )}
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <div className="app-main">
+          <Routes>
+            <Route path="/" element={<FrontPage />} />
+            <Route
+              path="/admin"
+              element={(
+                <ProtectedRoute allowedRole="admin">
+                  <AdminPortal />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/learning"
+              element={(
+                <ProtectedRoute allowedRole="user">
+                  <UserPortal />
+                </ProtectedRoute>
+              )}
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+        <footer className="app-footer">All rights reserved by muralialakuntla3@gmail.com</footer>
       </Router>
     </div>
   );

@@ -56,4 +56,13 @@ export async function apiRequest(path, options = {}) {
   return payload;
 }
 
+export function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Failed to read selected file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export { API_BASE_URL };
