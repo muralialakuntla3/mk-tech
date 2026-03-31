@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16
+    container_name: mk-tech-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mk_tech
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - mk-tech-postgres-data:/var/lib/postgresql/data
+    networks:
+      - mk-tech-net
+
+  backend:
+    build:
+      context: ./backend
+    container_name: mk-tech-backend
+    depends_on:
+      - db
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@db:5432/mk_tech
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: mk_tech
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    ports:
+      - '3000:3000'
+    networks:
+      - mk-tech-net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: mk-tech-frontend
+    depends_on:
+      - backend
+    environment:
+      REACT_APP_API_URL: http://backend:3000/api
+    ports:
+      - '8080:80'
+    networks:
+      - mk-tech-net
+
+networks:
+  mk-tech-net:
+    driver: bridge
+
+volumes:
+  mk-tech-postgres-data:
+

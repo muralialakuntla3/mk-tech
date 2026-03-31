@@ -1,0 +1,62 @@
+const express = require('express');
+const { pool } = require('../db');
+const { authenticate, requireRole } = require('../middleware/auth');
+
+const router = express.Router();
+
+router.use(authenticate, requireRole('user'));
+
+router.get('/courses', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          c.id AS course_id,
+          c.title AS course_title,
+          c.description,
+          cv.id AS video_id,
+          cv.title AS video_title,
+          cv.video_url,
+          cv.created_at AS video_created_at
+        FROM user_courses uc
+        JOIN courses c ON c.id = uc.course_id
+        LEFT JOIN course_videos cv ON cv.course_id = c.id
+        WHERE uc.user_id = $1
+        ORDER BY c.title ASC, cv.id ASC
+      `,
+      [req.user.id]
+    );
+
+    const courses = [];
+    const courseMap = new Map();
+
+    for (const row of result.rows) {
+      if (!courseMap.has(row.course_id)) {
+        const course = {
+          id: row.course_id,
+          title: row.course_title,
+          description: row.description,
+          videos: [],
+        };
+
+        courseMap.set(row.course_id, course);
+        courses.push(course);
+      }
+
+      if (row.video_id) {
+        courseMap.get(row.course_id).videos.push({
+          id: row.video_id,
+          title: row.video_title,
+          videoUrl: row.video_url,
+          createdAt: row.video_created_at,
+        });
+      }
+    }
+
+    return res.json({ courses });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+module.exports = router;

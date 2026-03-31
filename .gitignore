@@ -35,9 +35,13 @@ bower_components
 .lock-wscript
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
+frontend/build/
+backend/build/
 build/Release
 
 # Dependency directories
+frontend/node_modules/
+backend/node_modules/
 node_modules/
 jspm_packages/
 

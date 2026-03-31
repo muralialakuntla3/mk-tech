@@ -1,0 +1,23 @@
+name: build tech course
+on: 
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        type: string
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4.2.2
+      - name: calling composite action
+        uses: ./.github/actions/build
+        with:
+          node-version: " ${{ inputs.version }} "
+      - name: list files
+        run: |
+          ls -a
+      - name: build is done
+        run: echo "build job is done from composite action" 
+        

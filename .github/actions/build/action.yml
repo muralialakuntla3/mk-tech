@@ -1,0 +1,19 @@
+name: build
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v3.9.1
+      with:
+        node-version: ${{ inputs.version }}
+
+    - name: install node modules
+      run: npm install
+      shell: bash
+    - name: build
+      run: npm run build
+      shell: bash
+#    - name: linting
+#      run: npm test
+#      shell: bash
+   

@@ -1,0 +1,220 @@
+.portal-shell {
+  min-height: 100vh;
+  padding: 32px 20px 40px;
+  background: linear-gradient(180deg, #f5f8ff 0%, #eef3fb 100%);
+}
+
+.user-shell {
+  background: linear-gradient(180deg, #f8fbff 0%, #eef7ff 100%);
+}
+
+.portal-topbar {
+  max-width: 1200px;
+  margin: 0 auto 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.portal-heading {
+  margin: 0 0 8px;
+  font-size: 2.2rem;
+  color: #172033;
+}
+
+.portal-subtitle {
+  margin: 0;
+  max-width: 760px;
+  color: #56637a;
+}
+
+.secondary-button,
+.portal-card button {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #2e55ff;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.secondary-button {
+  background: #20304d;
+}
+
+.status-banner {
+  max-width: 1200px;
+  margin: 0 auto 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #eaf0ff;
+  color: #243b68;
+}
+
+.success-banner {
+  background: #ebfff4;
+  color: #166534;
+}
+
+.error-banner {
+  background: #fff1f2;
+  color: #b42318;
+}
+
+.admin-layout {
+  max-width: 1200px;
+  margin: 0 auto 20px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.portal-card {
+  max-width: 1200px;
+  margin: 0 auto 20px;
+  padding: 20px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 16px 32px rgba(31, 52, 97, 0.08);
+}
+
+.portal-card h2,
+.portal-card h3 {
+  margin-top: 0;
+  color: #1c2740;
+}
+
+.stack-form,
+.inline-form {
+  display: grid;
+  gap: 12px;
+}
+
+.stack-form input,
+.stack-form textarea,
+.inline-form input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d7deeb;
+  border-radius: 10px;
+  background: #fbfcff;
+}
+
+.stack-form textarea {
+  resize: vertical;
+}
+
+.field-label {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: #31425f;
+}
+
+.checkbox-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.checkbox-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #334669;
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #334669;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.course-list-grid,
+.user-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.course-list-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.course-card-panel,
+.user-summary {
+  padding: 16px;
+  border-radius: 14px;
+  background: #f8faff;
+  border: 1px solid #e2e8f6;
+}
+
+.video-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.video-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #eef3ff;
+  color: #2f4bc8;
+  text-decoration: none;
+}
+
+.video-link:hover {
+  background: #dfe7ff;
+}
+
+.muted-text {
+  color: #6b7280;
+}
+
+.empty-state {
+  padding: 18px;
+  border-radius: 12px;
+  background: #f8faff;
+  color: #5d6b82;
+}
+
+.user-summary {
+  display: grid;
+  gap: 6px;
+}
+
+.user-summary span {
+  color: #4d67ff;
+}
+
+.user-summary p {
+  margin: 0;
+  color: #4b5565;
+}
+
+@media (max-width: 900px) {
+  .portal-topbar,
+  .section-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
