@@ -251,12 +251,49 @@
   margin: 12px 0 16px;
 }
 
+.course-video-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+}
+
+.course-video-nav {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.course-video-player {
+  min-width: 0;
+}
+
 .video-frame {
   width: 100%;
   min-height: 420px;
   border: none;
   border-radius: 12px;
   background: #000;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #dfe5f2;
+}
+
+.data-table tbody tr {
+  cursor: pointer;
+}
+
+.data-table tbody tr:hover {
+  background: #f4f8ff;
 }
 
 .theme-dark {
@@ -311,6 +348,10 @@
   }
 
   .admin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .course-video-layout {
     grid-template-columns: 1fr;
   }
 }

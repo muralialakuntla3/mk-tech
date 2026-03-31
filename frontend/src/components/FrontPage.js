@@ -5,7 +5,7 @@ import './FrontPage.css';
 
 const FrontPage = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +26,7 @@ const FrontPage = () => {
     try {
       const response = await apiRequest('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       saveStoredAuth(response);
@@ -49,13 +49,13 @@ const FrontPage = () => {
 
         <div className="login-card">
           <form className="login-form" onSubmit={handleLogin}>
-            <label htmlFor="username">Username</label>
+            <label htmlFor="identifier">Username or Email</label>
             <input
-              id="username"
+              id="identifier"
               type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="Enter your username"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder="Enter your username or email"
               required
             />
 

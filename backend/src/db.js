@@ -27,6 +27,7 @@ async function initDatabase() {
         id SERIAL PRIMARY KEY,
         username VARCHAR(80) UNIQUE NOT NULL,
         email VARCHAR(160) UNIQUE,
+        profile_image TEXT,
         password_hash TEXT NOT NULL,
         full_name VARCHAR(120) NOT NULL,
         role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'user')),
@@ -47,6 +48,11 @@ async function initDatabase() {
     await client.query(`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS email VARCHAR(160) UNIQUE
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS profile_image TEXT
     `);
 
     await client.query(`

@@ -65,6 +65,7 @@ async function getDashboardData() {
         u.id,
         u.username,
         u.email,
+        u.profile_image,
         u.full_name,
         u.role,
         u.created_at,
@@ -81,7 +82,6 @@ async function getDashboardData() {
       FROM users u
       LEFT JOIN user_courses uc ON uc.user_id = u.id
       LEFT JOIN courses c ON c.id = uc.course_id
-      WHERE u.role = 'user'
       GROUP BY u.id
       ORDER BY u.created_at DESC, u.id DESC
     `),
@@ -100,6 +100,7 @@ async function getDashboardData() {
       id: user.id,
       username: user.username,
       email: user.email,
+      profileImage: user.profile_image || '',
       fullName: user.full_name,
       role: user.role,
       createdAt: user.created_at,
@@ -123,8 +124,8 @@ router.post('/courses', async (req, res, next) => {
     const description = req.body.description?.trim() || '';
     const imageUrl = req.body.imageUrl?.trim() || '';
 
-    if (!title) {
-      return res.status(400).json({ message: 'Course title is required.' });
+    if (!title || !imageUrl) {
+      return res.status(400).json({ message: 'Course title and image are required.' });
     }
 
     const result = await pool.query(
@@ -167,8 +168,8 @@ router.put('/courses/:courseId', async (req, res, next) => {
       return res.status(400).json({ message: 'A valid course ID is required.' });
     }
 
-    if (!title) {
-      return res.status(400).json({ message: 'Course title is required.' });
+    if (!title || !imageUrl) {
+      return res.status(400).json({ message: 'Course title and image are required.' });
     }
 
     const result = await pool.query(
@@ -278,10 +279,15 @@ router.post('/users', async (req, res, next) => {
     const fullName = req.body.fullName?.trim();
     const email = req.body.email?.trim().toLowerCase();
     const role = req.body.role === 'admin' ? 'admin' : 'user';
+    const profileImage = req.body.profileImage?.trim() || '';
     const assignedCourseIds = normalizeCourseIds(req.body.assignedCourseIds);
 
     if (!username || !password || !fullName || !email) {
       return res.status(400).json({ message: 'Full name, username, email, and password are required.' });
+    }
+
+    if (role === 'user' && !profileImage) {
+      return res.status(400).json({ message: 'Learner profile image is required.' });
     }
 
     await client.query('BEGIN');
@@ -290,11 +296,11 @@ router.post('/users', async (req, res, next) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const userResult = await client.query(
       `
-        INSERT INTO users (username, password_hash, full_name, role, email)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, username, email, full_name, role, created_at
+        INSERT INTO users (username, password_hash, full_name, role, email, profile_image)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, username, email, profile_image, full_name, role, created_at
       `,
-      [username, passwordHash, fullName, role, email]
+      [username, passwordHash, fullName, role, email, profileImage || null]
     );
 
     const user = userResult.rows[0];
@@ -325,6 +331,7 @@ router.post('/users', async (req, res, next) => {
         id: user.id,
         username: user.username,
         email: user.email,
+        profileImage: user.profile_image || '',
         fullName: user.full_name,
         role: user.role,
         createdAt: user.created_at,
@@ -351,6 +358,8 @@ router.put('/users/:userId', async (req, res, next) => {
     const fullName = req.body.fullName?.trim();
     const email = req.body.email?.trim().toLowerCase();
     const role = req.body.role === 'admin' ? 'admin' : 'user';
+    const profileImage = req.body.profileImage?.trim() || '';
+    const password = req.body.password?.trim() || '';
 
     if (!Number.isInteger(userId) || userId <= 0) {
       return res.status(400).json({ message: 'A valid user ID is required.' });
@@ -358,15 +367,23 @@ router.put('/users/:userId', async (req, res, next) => {
     if (!username || !fullName || !email) {
       return res.status(400).json({ message: 'Full name, username, and email are required.' });
     }
+    if (role === 'user' && !profileImage) {
+      return res.status(400).json({ message: 'Learner profile image is required.' });
+    }
+
+    const passwordClause = password ? ', password_hash = $6' : '';
+    const queryParams = password
+      ? [username, fullName, email, role, userId, await bcrypt.hash(password, 10), profileImage || null]
+      : [username, fullName, email, role, userId, profileImage || null];
 
     const result = await pool.query(
       `
         UPDATE users
-        SET username = $1, full_name = $2, email = $3, role = $4
+        SET username = $1, full_name = $2, email = $3, role = $4${passwordClause}, profile_image = $${password ? 7 : 6}
         WHERE id = $5
-        RETURNING id, username, full_name, email, role, created_at
+        RETURNING id, username, full_name, email, profile_image, role, created_at
       `,
-      [username, fullName, email, role, userId]
+      queryParams
     );
 
     if (!result.rowCount) {
@@ -380,6 +397,7 @@ router.put('/users/:userId', async (req, res, next) => {
         username: result.rows[0].username,
         fullName: result.rows[0].full_name,
         email: result.rows[0].email,
+        profileImage: result.rows[0].profile_image || '',
         role: result.rows[0].role,
         createdAt: result.rows[0].created_at,
       },
