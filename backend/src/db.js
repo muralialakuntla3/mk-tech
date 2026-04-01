@@ -30,9 +30,22 @@ async function initDatabase() {
         profile_image TEXT,
         password_hash TEXT NOT NULL,
         full_name VARCHAR(120) NOT NULL,
-        role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'user')),
+        role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'manager', 'user')),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name = 'users' AND constraint_name = 'users_role_check'
+        ) THEN
+          ALTER TABLE users DROP CONSTRAINT users_role_check;
+        END IF;
+        ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'manager', 'user'));
+      END $$;
     `);
 
     await client.query(`
@@ -90,6 +103,16 @@ async function initDatabase() {
         course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (user_id, course_id)
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS course_documents (
+        id SERIAL PRIMARY KEY,
+        course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        file_url TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
 

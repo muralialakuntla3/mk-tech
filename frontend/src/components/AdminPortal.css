@@ -417,17 +417,23 @@
   color: #ffffff;
 }
 
-.theme-dark .portal-card,
 .theme-dark .left-nav {
   background: #1a2236;
   box-shadow: none;
 }
 
-.theme-dark .portal-heading,
+/* Keep "white boxes" readable in dark theme. */
+.theme-dark .portal-card {
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.25);
+}
+
 .theme-dark .portal-card h2,
 .theme-dark .portal-card h3,
-.theme-dark .field-label {
-  color: #f1f5ff;
+.theme-dark .portal-card label,
+.theme-dark .portal-card .field-label {
+  color: #111827;
 }
 
 .theme-dark .portal-subtitle,
@@ -436,13 +442,13 @@
   color: #ffffff;
 }
 
-.theme-dark .stack-form input,
-.theme-dark .stack-form textarea,
-.theme-dark .inline-form input,
-.theme-dark .stack-form select {
-  background: #101827;
-  border-color: #31415f;
-  color: #ffffff;
+.theme-dark .portal-card .stack-form input,
+.theme-dark .portal-card .stack-form textarea,
+.theme-dark .portal-card .inline-form input,
+.theme-dark .portal-card .stack-form select {
+  background: #fbfcff;
+  border-color: #d7deeb;
+  color: #111827;
 }
 
 .theme-dark .course-card-panel,
@@ -467,6 +473,17 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+.top-profile .icon-button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: inherit;
+}
+
+.theme-dark .top-profile .icon-button {
+  border-color: rgba(17, 24, 39, 0.18);
+  color: #111827;
 }
 
 .top-avatar {

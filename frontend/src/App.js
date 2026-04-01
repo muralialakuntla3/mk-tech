@@ -13,8 +13,11 @@ const ProtectedRoute = ({ children, allowedRole }) => {
     return <Navigate to="/" replace />;
   }
 
-  if (allowedRole && auth.user.role !== allowedRole) {
-    return <Navigate to={auth.user.role === 'admin' ? '/admin' : '/learning'} replace />;
+  if (allowedRole) {
+    const allowedRoles = Array.isArray(allowedRole) ? allowedRole : [allowedRole];
+    if (!allowedRoles.includes(auth.user.role)) {
+      return <Navigate to={auth.user.role === 'user' ? '/learning' : '/admin'} replace />;
+    }
   }
 
   return children;
@@ -30,7 +33,7 @@ function App() {
             <Route
               path="/admin"
               element={(
-                <ProtectedRoute allowedRole="admin">
+                <ProtectedRoute allowedRole={['admin', 'manager']}>
                   <AdminPortal />
                 </ProtectedRoute>
               )}

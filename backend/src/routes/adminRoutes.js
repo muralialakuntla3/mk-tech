@@ -6,7 +6,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.use(authenticate, requireRole('admin'));
+router.use(authenticate, requireRole('admin', 'manager'));
 
 async function isMasterAdminUser(userId, client = pool) {
   const result = await client.query('SELECT username, email, role FROM users WHERE id = $1', [userId]);
@@ -71,7 +71,7 @@ async function getDashboardData() {
       FROM courses c
       LEFT JOIN course_videos cv ON cv.course_id = c.id
       GROUP BY c.id
-      ORDER BY c.created_at DESC, c.id DESC
+      ORDER BY LOWER(c.title) ASC, c.id ASC
     `),
     pool.query(`
       SELECT
@@ -96,7 +96,7 @@ async function getDashboardData() {
       LEFT JOIN user_courses uc ON uc.user_id = u.id
       LEFT JOIN courses c ON c.id = uc.course_id
       GROUP BY u.id
-      ORDER BY u.created_at DESC, u.id DESC
+      ORDER BY LOWER(COALESCE(u.full_name, u.username)) ASC, u.id ASC
     `),
   ]);
 
@@ -344,15 +344,46 @@ router.get('/courses/:courseId/modules', async (req, res, next) => {
       return res.status(400).json({ message: 'A valid course ID is required.' });
     }
     const result = await pool.query(
-      'SELECT id, title, created_at FROM course_modules WHERE course_id = $1 ORDER BY created_at DESC, id DESC',
+      `
+        SELECT
+          cm.id AS module_id,
+          cm.title AS module_title,
+          cm.created_at AS module_created_at,
+          cv.id AS video_id,
+          cv.title AS video_title,
+          cv.video_url,
+          cv.created_at AS video_created_at
+        FROM course_modules cm
+        LEFT JOIN course_videos cv ON cv.module_id = cm.id
+        WHERE cm.course_id = $1
+        ORDER BY LOWER(cm.title) ASC, cv.created_at DESC, cv.id DESC
+      `,
       [courseId]
     );
+    const modules = [];
+    const map = new Map();
+    for (const row of result.rows) {
+      if (!map.has(row.module_id)) {
+        const moduleItem = {
+          id: row.module_id,
+          title: row.module_title,
+          createdAt: row.module_created_at,
+          videos: [],
+        };
+        map.set(row.module_id, moduleItem);
+        modules.push(moduleItem);
+      }
+      if (row.video_id) {
+        map.get(row.module_id).videos.push({
+          id: row.video_id,
+          title: row.video_title,
+          videoUrl: row.video_url,
+          createdAt: row.video_created_at,
+        });
+      }
+    }
     return res.json({
-      modules: result.rows.map((moduleItem) => ({
-        id: moduleItem.id,
-        title: moduleItem.title,
-        createdAt: moduleItem.created_at,
-      })),
+      modules,
     });
   } catch (error) {
     return next(error);
@@ -391,6 +422,124 @@ router.post('/courses/:courseId/modules', async (req, res, next) => {
   }
 });
 
+router.put('/courses/:courseId/modules/:moduleId', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const moduleId = Number(req.params.moduleId);
+    const title = req.body.title?.trim();
+    if (!Number.isInteger(courseId) || courseId <= 0 || !Number.isInteger(moduleId) || moduleId <= 0) {
+      return res.status(400).json({ message: 'Valid course and module IDs are required.' });
+    }
+    if (!title) {
+      return res.status(400).json({ message: 'Module title is required.' });
+    }
+    const result = await pool.query(
+      `
+        UPDATE course_modules
+        SET title = $1
+        WHERE id = $2 AND course_id = $3
+        RETURNING id, course_id, title, created_at
+      `,
+      [title, moduleId, courseId]
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Module not found.' });
+    }
+    return res.json({ module: result.rows[0], message: 'Module updated successfully.' });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete('/courses/:courseId/modules/:moduleId', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const moduleId = Number(req.params.moduleId);
+    if (!Number.isInteger(courseId) || courseId <= 0 || !Number.isInteger(moduleId) || moduleId <= 0) {
+      return res.status(400).json({ message: 'Valid course and module IDs are required.' });
+    }
+    const result = await pool.query(
+      'DELETE FROM course_modules WHERE id = $1 AND course_id = $2 RETURNING id',
+      [moduleId, courseId]
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Module not found.' });
+    }
+    return res.json({ message: 'Module deleted successfully.' });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/courses/:courseId/documents', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    if (!Number.isInteger(courseId) || courseId <= 0) {
+      return res.status(400).json({ message: 'A valid course ID is required.' });
+    }
+    const result = await pool.query(
+      'SELECT id, name, file_url, created_at FROM course_documents WHERE course_id = $1 ORDER BY LOWER(name) ASC, id ASC',
+      [courseId]
+    );
+    return res.json({
+      documents: result.rows.map((row) => ({ id: row.id, name: row.name, fileUrl: row.file_url, createdAt: row.created_at })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/courses/:courseId/documents', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const name = req.body.name?.trim();
+    const fileUrl = req.body.fileUrl?.trim();
+    if (!Number.isInteger(courseId) || courseId <= 0) {
+      return res.status(400).json({ message: 'A valid course ID is required.' });
+    }
+    if (!name || !fileUrl) {
+      return res.status(400).json({ message: 'Document name and file are required.' });
+    }
+    const result = await pool.query(
+      `INSERT INTO course_documents (course_id, name, file_url)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, file_url, created_at`,
+      [courseId, name, fileUrl]
+    );
+    return res.status(201).json({
+      document: {
+        id: result.rows[0].id,
+        name: result.rows[0].name,
+        fileUrl: result.rows[0].file_url,
+        createdAt: result.rows[0].created_at,
+      },
+      message: 'Document uploaded successfully.',
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete('/courses/:courseId/documents/:documentId', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const documentId = Number(req.params.documentId);
+    if (!Number.isInteger(courseId) || courseId <= 0 || !Number.isInteger(documentId) || documentId <= 0) {
+      return res.status(400).json({ message: 'Valid course and document IDs are required.' });
+    }
+    const result = await pool.query(
+      'DELETE FROM course_documents WHERE id = $1 AND course_id = $2 RETURNING id',
+      [documentId, courseId]
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ message: 'Document not found.' });
+    }
+    return res.json({ message: 'Document deleted successfully.' });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.delete('/courses/:courseId/videos/:videoId', async (req, res, next) => {
   try {
     const courseId = Number(req.params.courseId);
@@ -423,7 +572,11 @@ router.post('/users', async (req, res, next) => {
     const password = req.body.password?.trim();
     const fullName = req.body.fullName?.trim();
     const email = req.body.email?.trim().toLowerCase();
-    const role = req.body.role === 'admin' ? 'admin' : 'user';
+    const requestedRole = String(req.body.role || 'user').toLowerCase();
+    const role = ['admin', 'manager', 'user'].includes(requestedRole) ? requestedRole : 'user';
+    if (req.user.role === 'manager' && role !== 'user') {
+      return res.status(403).json({ message: 'Managers can create learners only.' });
+    }
     const profileImage = req.body.profileImage?.trim() || '';
     const assignedCourseIds = normalizeCourseIds(req.body.assignedCourseIds);
 
@@ -502,7 +655,8 @@ router.put('/users/:userId', async (req, res, next) => {
     const username = req.body.username?.trim().toLowerCase();
     const fullName = req.body.fullName?.trim();
     const email = req.body.email?.trim().toLowerCase();
-    const role = req.body.role === 'admin' ? 'admin' : 'user';
+    const requestedRole = String(req.body.role || 'user').toLowerCase();
+    const role = ['admin', 'manager', 'user'].includes(requestedRole) ? requestedRole : 'user';
     const profileImage = req.body.profileImage?.trim() || '';
     const password = req.body.password?.trim() || '';
 
@@ -511,6 +665,9 @@ router.put('/users/:userId', async (req, res, next) => {
     }
     if (await isMasterAdminUser(userId)) {
       return res.status(403).json({ message: 'Master admin role/profile cannot be modified.' });
+    }
+    if (req.user.role === 'manager' && role !== 'user') {
+      return res.status(403).json({ message: 'Managers can update learners only.' });
     }
     if (!username || !fullName || !email) {
       return res.status(400).json({ message: 'Full name, username, and email are required.' });
@@ -566,6 +723,15 @@ router.delete('/users/:userId', async (req, res, next) => {
     }
     if (await isMasterAdminUser(userId)) {
       return res.status(403).json({ message: 'Master admin cannot be deleted.' });
+    }
+    if (req.user.role === 'manager') {
+      const targetUser = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
+      if (!targetUser.rowCount) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+      if (targetUser.rows[0].role !== 'user') {
+        return res.status(403).json({ message: 'Managers can delete learners only.' });
+      }
     }
 
     const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
@@ -660,7 +826,7 @@ router.get('/courses', async (req, res, next) => {
           OR LOWER(c.title) LIKE '%' || $1 || '%'
           OR LOWER(c.description) LIKE '%' || $1 || '%'
         GROUP BY c.id
-        ORDER BY c.created_at DESC, c.id DESC
+        ORDER BY LOWER(c.title) ASC, c.id ASC
       `,
       [search]
     );
@@ -683,6 +849,11 @@ router.get('/courses', async (req, res, next) => {
 router.get('/learners', async (req, res, next) => {
   try {
     const search = req.query.search?.trim().toLowerCase() || '';
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const pageSizeRaw = Number(req.query.pageSize) || 10;
+    const pageSize = [10, 20, 50].includes(pageSizeRaw) ? pageSizeRaw : 10;
+    const role = req.query.role === 'admin' || req.query.role === 'manager' ? req.query.role : 'user';
+    const offset = (page - 1) * pageSize;
     const result = await pool.query(
       `
         SELECT
@@ -694,16 +865,32 @@ router.get('/learners', async (req, res, next) => {
           u.created_at
         FROM users u
         WHERE
-          u.role = 'user'
+          u.role = $2
           AND (
             $1 = ''
             OR LOWER(u.username) LIKE '%' || $1 || '%'
             OR LOWER(u.full_name) LIKE '%' || $1 || '%'
             OR LOWER(COALESCE(u.email, '')) LIKE '%' || $1 || '%'
           )
-        ORDER BY u.created_at DESC, u.id DESC
+        ORDER BY LOWER(COALESCE(u.full_name, u.username)) ASC, u.id ASC
+        LIMIT $3 OFFSET $4
       `,
-      [search]
+      [search, role, pageSize, offset]
+    );
+    const totalResult = await pool.query(
+      `
+        SELECT COUNT(*)::int AS total
+        FROM users u
+        WHERE
+          u.role = $2
+          AND (
+            $1 = ''
+            OR LOWER(u.username) LIKE '%' || $1 || '%'
+            OR LOWER(u.full_name) LIKE '%' || $1 || '%'
+            OR LOWER(COALESCE(u.email, '')) LIKE '%' || $1 || '%'
+          )
+      `,
+      [search, role]
     );
 
     return res.json({
@@ -715,6 +902,11 @@ router.get('/learners', async (req, res, next) => {
         role: learner.role,
         createdAt: learner.created_at,
       })),
+      pagination: {
+        page,
+        pageSize,
+        total: totalResult.rows[0]?.total || 0,
+      },
     });
   } catch (error) {
     return next(error);
@@ -758,16 +950,38 @@ router.post('/courses/:courseId/learners', async (req, res, next) => {
     const courseId = Number(req.params.courseId);
     const learnerIds = [...new Set((Array.isArray(req.body.learnerIds) ? req.body.learnerIds : []).map(Number))]
       .filter((id) => Number.isInteger(id) && id > 0);
+    const learnerEmails = [...new Set((Array.isArray(req.body.learnerEmails) ? req.body.learnerEmails : [])
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean))];
 
     if (!Number.isInteger(courseId) || courseId <= 0) {
       return res.status(400).json({ message: 'A valid course ID is required.' });
     }
-    if (!learnerIds.length) {
+    if (!learnerIds.length && !learnerEmails.length) {
       return res.status(400).json({ message: 'At least one learner is required.' });
     }
 
     await client.query('BEGIN');
-    for (const learnerId of learnerIds) {
+    let resolvedIds = learnerIds;
+    if (learnerEmails.length) {
+      const emailResult = await client.query(
+        `
+          SELECT id, LOWER(COALESCE(email, '')) AS email
+          FROM users
+          WHERE role = 'user' AND LOWER(COALESCE(email, '')) = ANY($1::text[])
+        `,
+        [learnerEmails]
+      );
+      const emailIds = emailResult.rows.map((row) => row.id);
+      resolvedIds = [...new Set([...resolvedIds, ...emailIds])];
+      if (emailIds.length !== learnerEmails.length) {
+        const foundEmails = new Set(emailResult.rows.map((row) => row.email));
+        const missingEmails = learnerEmails.filter((email) => !foundEmails.has(email));
+        await client.query('ROLLBACK');
+        return res.status(404).json({ message: `Learner email not found: ${missingEmails.join(', ')}` });
+      }
+    }
+    for (const learnerId of resolvedIds) {
       await client.query(
         `
           INSERT INTO user_courses (user_id, course_id)
@@ -784,6 +998,21 @@ router.post('/courses/:courseId/learners', async (req, res, next) => {
     return next(error);
   } finally {
     client.release();
+  }
+});
+
+router.delete('/courses/:courseId/learners/:learnerId', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const learnerId = Number(req.params.learnerId);
+    if (!Number.isInteger(courseId) || courseId <= 0 || !Number.isInteger(learnerId) || learnerId <= 0) {
+      return res.status(400).json({ message: 'Valid course and learner IDs are required.' });
+    }
+
+    await pool.query('DELETE FROM user_courses WHERE course_id = $1 AND user_id = $2', [courseId, learnerId]);
+    return res.json({ message: 'Learner removed from course successfully.' });
+  } catch (error) {
+    return next(error);
   }
 });
 
