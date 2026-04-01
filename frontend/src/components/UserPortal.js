@@ -178,6 +178,16 @@ const UserPortal = () => {
                     <button type="button" onClick={() => setSelectedCourse(null)}>Back to courses</button>
                   </div>
                   <p>{selectedCourse.description || 'No description available.'}</p>
+                  {(selectedCourse.documents || []).length ? (
+                    <div className="video-list">
+                      <strong>Documents</strong>
+                      {(selectedCourse.documents || []).map((doc) => (
+                        <a key={doc.id} href={doc.fileUrl} target="_blank" rel="noreferrer" className="video-link">
+                          {doc.name}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="course-video-layout">
                     <div className="course-video-nav">
                       {(selectedCourse.modules || []).map((moduleItem) => (

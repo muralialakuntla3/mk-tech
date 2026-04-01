@@ -15,7 +15,7 @@ const FrontPage = () => {
     const existingAuth = getStoredAuth();
 
     if (existingAuth?.token && existingAuth?.user?.role) {
-      navigate(existingAuth.user.role === 'admin' ? '/admin' : '/learning', { replace: true });
+      navigate(existingAuth.user.role === 'user' ? '/learning' : '/admin', { replace: true });
     }
   }, [navigate]);
 
@@ -31,7 +31,7 @@ const FrontPage = () => {
       });
 
       saveStoredAuth(response);
-      navigate(response.user.role === 'admin' ? '/admin' : '/learning');
+      navigate(response.user.role === 'user' ? '/learning' : '/admin');
     } catch (requestError) {
       setError(requestError.message);
     } finally {

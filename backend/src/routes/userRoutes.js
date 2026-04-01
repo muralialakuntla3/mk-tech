@@ -71,6 +71,32 @@ router.get('/courses', async (req, res, next) => {
       }
     }
 
+    const courseIds = courses.map((course) => course.id);
+    if (courseIds.length) {
+      const docsResult = await pool.query(
+        `
+          SELECT id, course_id, name, file_url, created_at
+          FROM course_documents
+          WHERE course_id = ANY($1::int[])
+          ORDER BY LOWER(name) ASC, id ASC
+        `,
+        [courseIds]
+      );
+      const docsByCourse = new Map();
+      for (const row of docsResult.rows) {
+        if (!docsByCourse.has(row.course_id)) docsByCourse.set(row.course_id, []);
+        docsByCourse.get(row.course_id).push({
+          id: row.id,
+          name: row.name,
+          fileUrl: row.file_url,
+          createdAt: row.created_at,
+        });
+      }
+      for (const course of courses) {
+        course.documents = docsByCourse.get(course.id) || [];
+      }
+    }
+
     return res.json({ courses });
   } catch (error) {
     return next(error);
