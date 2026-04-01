@@ -1,17 +1,70 @@
-## MK Tech - 3 Tier Application
+## MK Tech - Learning Platform (3-tier)
 
 **Layers**
 - **Frontend**: React app in `frontend` (runs on port `3000` in dev, served from Nginx on port `8080` via Docker).
-- **Backend**: Node.js / Express API in `backend` (runs on port **`3000`**).
+- **Backend**: Node.js / Express API in `backend`.
 - **Database**: PostgreSQL.
 
-The backend connects to PostgreSQL on startup and will automatically create a default admin user:
-- **username**: `admin`
-- **password**: `admin`
+The backend connects to PostgreSQL on startup and will automatically ensure schema exists (tables + constraints) and can seed a **master admin** if configured via environment.
 
 ---
 
-## Backend details
+## Roles & permissions
+
+The system supports 3 roles:
+
+- **Admin** (`admin`)
+  - Full access to Admin Console.
+  - Can create/update/delete **Admin**, **Manager**, and **Learner** accounts (except the configured master admin cannot be edited/deleted).
+  - Can manage courses, modules, videos, enrollments, and course documents.
+- **Manager** (`manager`)
+  - Access to Admin Console.
+  - Can manage courses, modules, videos, enrollments, and course documents.
+  - **Cannot** create/update/delete Admin/Manager users.
+  - Can create/update/delete **Learners** only.
+- **Learner** (`user`)
+  - Access to Learner Console only.
+  - Can view assigned courses, watch videos, and read course documents in-app.
+
+---
+
+## Frontend (React)
+
+### Run locally
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+### Environment
+
+Create `frontend/.env` (optional):
+
+```bash
+REACT_APP_API_URL=http://localhost:3000/api
+```
+
+If `REACT_APP_API_URL` is not set, the app defaults to `http://localhost:5000`.
+
+### UI notes (features)
+
+- **Full-width layout**: the admin/learner consoles use full page width (no empty borders).
+- **Theme toggle**: icon appears beside the username in the top right.
+- **Dark theme readability**: card content stays readable (white-card surfaces keep black text).
+- **Course Admin page** (Admin/Manager console):
+  - Tabs: **Overview** (incl. documents), **Videos** (modules + videos), **Enrolled** (add/remove learners).
+  - Tables for modules/videos with edit ✏️ and delete 🗑️ actions.
+  - Documents support **upload** and **link**; documents open **inside the portal** via a compact preview modal.
+- **Learner course page**:
+  - Documents are shown and open **inside the portal** via preview modal.
+- **Google Drive video links**:
+  - Drive share links are converted to embeddable preview links (`/preview`) to reduce “login required” issues for public files.
+
+---
+
+## Backend (Node/Express)
 
 - **Port**: `3000` (configurable via `PORT` env var).
 - **Base URL**: `http://localhost:3000/api` (when running locally or with Docker on the host).
@@ -22,10 +75,9 @@ The backend connects to PostgreSQL on startup and will automatically create a de
 - `GET /api/status` → `{ "success": true, "message": "Backend is running" }`
 
 On startup, the backend:
-1. Tries to connect to the configured PostgreSQL database.
-2. Runs migrations/DDL to ensure required tables exist.
-3. Checks for a user with username `admin`.
-4. If not found, creates an admin with username `admin` and password `admin`.
+1. Connects to the configured PostgreSQL database.
+2. Runs migrations/DDL to ensure required tables exist (including role constraints and course documents).
+3. Optionally seeds a master admin if `MASTER_ADMIN_USERNAME` and `MASTER_ADMIN_PASSWORD` are set.
 
 ---
 
@@ -53,20 +105,13 @@ Key variables (you can override as needed):
 
 For Docker, these are supplied by `docker-compose.yml` – normally you’ll only change **database details** there (host/user/password/db name).
 
-### Frontend (`frontend/.env`)
+### Master admin (optional)
 
-If needed, create `frontend/.env` to override the API URL:
+Set these (Docker env or `backend/.env`) to create a non-editable master admin:
 
-```bash
-cd frontend
-cp .env.example .env   # if present
-```
-
-Example:
-
-```bash
-REACT_APP_API_URL=http://localhost:3000/api
-```
+- `MASTER_ADMIN_USERNAME=admin`
+- `MASTER_ADMIN_PASSWORD=admin`
+- `MASTER_ADMIN_EMAIL=admin@example.com` (optional)
 
 ---
 
@@ -87,7 +132,7 @@ npm start
 The backend will:
 - Listen on `http://localhost:3000`.
 - Connect to PostgreSQL using the env vars.
-- Create the default admin (`admin` / `admin`) if it does not exist.
+- Ensure schema exists and seed master admin if configured.
 
 Verify it is up:
 
@@ -107,9 +152,12 @@ npm start
 ```
 
 The React dev server runs on `http://localhost:3000` by default.  
-If you are running the backend on the same port, ensure the frontend is configured to call `REACT_APP_API_URL=http://localhost:3000/api` and that you don’t run two dev servers on port 3000 simultaneously. For a clean separation during manual dev you can:
-- run backend on `PORT=3000` (by temporarily changing `.env`) and
-- set `REACT_APP_API_URL=http://localhost:3000/api`.
+If you are running the backend on `PORT=3000` you must run the frontend on a different port (or vice versa). Common options:
+
+- Keep backend on **3000** and run frontend on **3001** (set `PORT=3001` in the frontend shell), or
+- Run backend on **5000** and keep frontend on **3000**.
+
+Make sure `REACT_APP_API_URL` points to the backend’s base URL (example: `http://localhost:3000/api`).
 
 ---
 
@@ -142,7 +190,7 @@ This will start:
   - Environment:
     - `PORT=3000`
     - `DATABASE_URL=postgres://postgres:postgres@db:5432/mk_tech`
-  - On start, connects to `db`, ensures schema, and creates `admin/admin` user if missing.
+  - On start, connects to `db` and ensures schema (and seeds master admin if configured).
 
 - **frontend**
   - Built from `frontend/Dockerfile`
@@ -178,4 +226,46 @@ This stops containers but preserves the PostgreSQL data volume (`mk-tech-postgre
 
 - **CORS** is fully open on the backend, so any origin can call the API.
 - On **every backend start**, the application attempts a database connection; if it cannot connect, it exits with an error.
-- Admin user seeding is **idempotent**: it only creates the `admin/admin` account if it doesn’t already exist.
+
+---
+
+## Key API routes (high-level)
+
+All routes are under `/api`.
+
+### Auth
+
+- `POST /auth/login` (identifier can be username or email)
+- `GET /auth/me`
+- `PUT /auth/me`
+- `PUT /auth/me/password`
+
+### Admin/Manager
+
+- `GET /admin/dashboard` (lightweight: courses + users summary)
+- `GET /admin/learners?role=user|admin|manager&search=&page=&pageSize=10|20|50` (server pagination)
+- Courses
+  - `POST /admin/courses`
+  - `PUT /admin/courses/:courseId`
+  - `DELETE /admin/courses/:courseId`
+  - `GET /admin/courses/:courseId/videos`
+  - `POST /admin/courses/:courseId/videos`
+  - `PUT /admin/courses/:courseId/videos/:videoId`
+  - `DELETE /admin/courses/:courseId/videos/:videoId`
+- Modules
+  - `GET /admin/courses/:courseId/modules` (includes nested videos per module)
+  - `POST /admin/courses/:courseId/modules`
+  - `PUT /admin/courses/:courseId/modules/:moduleId`
+  - `DELETE /admin/courses/:courseId/modules/:moduleId`
+- Enrollments
+  - `GET /admin/courses/:courseId/learners`
+  - `POST /admin/courses/:courseId/learners` (supports `learnerIds` and/or `learnerEmails`)
+  - `DELETE /admin/courses/:courseId/learners/:learnerId`
+- Documents
+  - `GET /admin/courses/:courseId/documents`
+  - `POST /admin/courses/:courseId/documents` (supports upload-as-data-url or link)
+  - `DELETE /admin/courses/:courseId/documents/:documentId`
+
+### Learner
+
+- `GET /user/courses` (includes modules/videos and `documents`; documents are readable in-app)
