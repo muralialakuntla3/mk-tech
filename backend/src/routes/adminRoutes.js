@@ -55,19 +55,7 @@ async function getDashboardData() {
         c.description,
         c.image_url,
         c.created_at,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'id', cv.id,
-              'title', cv.title,
-              'moduleId', cv.module_id,
-              'videoUrl', cv.video_url,
-              'createdAt', cv.created_at
-            )
-            ORDER BY cv.created_at DESC, cv.id DESC
-          ) FILTER (WHERE cv.id IS NOT NULL),
-          '[]'::json
-        ) AS videos
+        COUNT(cv.id)::int AS video_count
       FROM courses c
       LEFT JOIN course_videos cv ON cv.course_id = c.id
       GROUP BY c.id
@@ -81,20 +69,8 @@ async function getDashboardData() {
         u.profile_image,
         u.full_name,
         u.role,
-        u.created_at,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'id', c.id,
-              'title', c.title
-            )
-            ORDER BY c.title
-          ) FILTER (WHERE c.id IS NOT NULL),
-          '[]'::json
-        ) AS courses
+        u.created_at
       FROM users u
-      LEFT JOIN user_courses uc ON uc.user_id = u.id
-      LEFT JOIN courses c ON c.id = uc.course_id
       GROUP BY u.id
       ORDER BY LOWER(COALESCE(u.full_name, u.username)) ASC, u.id ASC
     `),
@@ -107,7 +83,7 @@ async function getDashboardData() {
       description: course.description,
       imageUrl: course.image_url || '',
       createdAt: course.created_at,
-      videos: Array.isArray(course.videos) ? course.videos : [],
+      videoCount: course.video_count,
     })),
     users: usersResult.rows.map((user) => ({
       id: user.id,
@@ -122,10 +98,38 @@ async function getDashboardData() {
           || (config.masterAdmin.email?.trim().toLowerCase() && user.email?.toLowerCase() === config.masterAdmin.email.trim().toLowerCase())
         ),
       createdAt: user.created_at,
-      courses: Array.isArray(user.courses) ? user.courses : [],
     })),
   };
 }
+
+router.get('/courses/:courseId/videos', async (req, res, next) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    if (!Number.isInteger(courseId) || courseId <= 0) {
+      return res.status(400).json({ message: 'A valid course ID is required.' });
+    }
+    const result = await pool.query(
+      `
+        SELECT id, module_id, title, video_url, created_at
+        FROM course_videos
+        WHERE course_id = $1
+        ORDER BY created_at DESC, id DESC
+      `,
+      [courseId]
+    );
+    return res.json({
+      videos: result.rows.map((row) => ({
+        id: row.id,
+        moduleId: row.module_id,
+        title: row.title,
+        videoUrl: row.video_url,
+        createdAt: row.created_at,
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 router.get('/dashboard', async (req, res, next) => {
   try {

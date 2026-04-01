@@ -6,6 +6,14 @@ import './AdminPortal.css';
 const getEmbedUrl = (url) => {
   try {
     const parsed = new URL(url);
+    if (parsed.hostname.includes('drive.google.com')) {
+      const parts = parsed.pathname.split('/');
+      const fileIdIndex = parts.findIndex((p) => p === 'd') + 1;
+      const fileId = fileIdIndex > 0 ? parts[fileIdIndex] : '';
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+    }
     if (parsed.hostname.includes('youtube.com')) {
       if (parsed.pathname.startsWith('/shorts/')) {
         const id = parsed.pathname.split('/')[2];
@@ -51,6 +59,7 @@ const UserPortal = () => {
     `${course.title} ${course.description || ''}`.toLowerCase().includes(search.toLowerCase())
   );
   const [activeVideoId, setActiveVideoId] = useState(null);
+  const [previewDoc, setPreviewDoc] = useState(null);
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -182,9 +191,9 @@ const UserPortal = () => {
                     <div className="video-list">
                       <strong>Documents</strong>
                       {(selectedCourse.documents || []).map((doc) => (
-                        <a key={doc.id} href={doc.fileUrl} target="_blank" rel="noreferrer" className="video-link">
+                        <button key={doc.id} type="button" onClick={() => setPreviewDoc(doc)} className="video-link">
                           {doc.name}
-                        </a>
+                        </button>
                       ))}
                     </div>
                   ) : null}
@@ -223,6 +232,19 @@ const UserPortal = () => {
                 </section>
               )}
             </>
+          ) : null}
+          {previewDoc ? (
+            <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setPreviewDoc(null)}>
+              <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <strong>{previewDoc.name || 'Document'}</strong>
+                  <button type="button" onClick={() => setPreviewDoc(null)}>Close</button>
+                </div>
+                <div className="modal-body">
+                  <iframe title={previewDoc.name || 'Document'} src={previewDoc.fileUrl} className="modal-frame" />
+                </div>
+              </div>
+            </div>
           ) : null}
 
           {tab === 'settings' ? (

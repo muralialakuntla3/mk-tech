@@ -1,16 +1,18 @@
 .portal-shell {
   min-height: 100vh;
-  padding: 32px 20px 40px;
+  padding: 0;
   background: linear-gradient(180deg, #f5f8ff 0%, #eef3fb 100%);
   color: #111827;
 }
 
 .console-layout {
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
   display: grid;
   grid-template-columns: 260px 1fr;
   gap: 20px;
+  padding: 20px;
 }
 
 .left-nav {
@@ -42,8 +44,8 @@
 }
 
 .portal-topbar {
-  max-width: 1200px;
-  margin: 0 auto 20px;
+  max-width: 100%;
+  margin: 0 0 20px;
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -127,8 +129,8 @@
 }
 
 .status-banner {
-  max-width: 1200px;
-  margin: 0 auto 16px;
+  max-width: 100%;
+  margin: 0 0 16px;
   padding: 12px 14px;
   border-radius: 12px;
   background: #eaf0ff;
@@ -146,16 +148,16 @@
 }
 
 .admin-layout {
-  max-width: 1200px;
-  margin: 0 auto 20px;
+  max-width: 100%;
+  margin: 0 0 20px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
 }
 
 .portal-card {
-  max-width: 1200px;
-  margin: 0 auto 20px;
+  max-width: 100%;
+  margin: 0 0 20px;
   padding: 20px;
   border-radius: 18px;
   background: #ffffff;
@@ -174,6 +176,11 @@
   gap: 12px;
 }
 
+.inline-form {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: end;
+}
+
 .stack-form input,
 .stack-form textarea,
 .inline-form input,
@@ -184,6 +191,51 @@
   border-radius: 10px;
   background: #fbfcff;
   color: #111827;
+  min-width: 0;
+}
+
+.inline-form select {
+  min-width: 0;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.modal-card {
+  width: min(980px, 100%);
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 14px;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-body {
+  min-height: 360px;
+}
+
+.modal-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 
 .stack-form textarea {

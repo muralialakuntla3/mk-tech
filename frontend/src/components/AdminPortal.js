@@ -12,6 +12,12 @@ const emptyUser = { fullName: '', username: '', email: '', password: '', role: '
 const getEmbedUrl = (url) => {
   try {
     const parsed = new URL(url);
+    if (parsed.hostname.includes('drive.google.com')) {
+      const parts = parsed.pathname.split('/');
+      const fileIdIndex = parts.findIndex((p) => p === 'd') + 1;
+      const fileId = fileIdIndex > 0 ? parts[fileIdIndex] : '';
+      if (fileId) return `https://drive.google.com/file/d/${fileId}/preview`;
+    }
     if (parsed.hostname.includes('youtube.com')) {
       if (parsed.pathname.startsWith('/shorts/')) {
         const id = parsed.pathname.split('/')[2];
@@ -50,6 +56,7 @@ const AdminPortal = () => {
   const [learnerCourses, setLearnerCourses] = useState([]);
   const [selectedLearnersToEnroll, setSelectedLearnersToEnroll] = useState([]);
   const [videoForm, setVideoForm] = useState({ title: '', videoUrl: '' });
+  const [courseVideos, setCourseVideos] = useState([]);
   const [modules, setModules] = useState([]);
   const [moduleTitle, setModuleTitle] = useState('');
   const [editingModuleId, setEditingModuleId] = useState(null);
@@ -65,6 +72,10 @@ const AdminPortal = () => {
   const [learnerSection, setLearnerSection] = useState('user');
   const [learnerPage, setLearnerPage] = useState(1);
   const [learnerPageSize, setLearnerPageSize] = useState(10);
+  const [pagedUsers, setPagedUsers] = useState([]);
+  const [serverTotalUsers, setServerTotalUsers] = useState(0);
+  const [isUsersLoading, setIsUsersLoading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState(null);
   const [profileForm, setProfileForm] = useState({
     username: auth?.user?.username || '',
     fullName: auth?.user?.fullName || '',
@@ -74,20 +85,24 @@ const AdminPortal = () => {
   });
 
   const learners = useMemo(() => users.filter((user) => user.role === 'user'), [users]);
-  const roleScopedUsers = useMemo(() => users.filter((u) => u.role === learnerSection), [users, learnerSection]);
   const filteredCourses = useMemo(
     () => courses.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(search.toLowerCase())),
     [courses, search]
   );
-  const filteredUsers = useMemo(
-    () => roleScopedUsers.filter((item) => `${item.username} ${item.fullName} ${item.email || ''}`.toLowerCase().includes(search.toLowerCase())),
-    [roleScopedUsers, search]
-  );
-  const pagedUsers = useMemo(() => {
-    const start = (learnerPage - 1) * learnerPageSize;
-    return filteredUsers.slice(start, start + learnerPageSize);
-  }, [filteredUsers, learnerPage, learnerPageSize]);
-  const totalLearnerPages = Math.max(1, Math.ceil(filteredUsers.length / learnerPageSize));
+  const totalLearnerPages = Math.max(1, Math.ceil(serverTotalUsers / learnerPageSize));
+
+  const loadUsersPage = async () => {
+    try {
+      setIsUsersLoading(true);
+      const data = await apiRequest(`/admin/learners?role=${encodeURIComponent(learnerSection)}&search=${encodeURIComponent(search)}&page=${learnerPage}&pageSize=${learnerPageSize}`);
+      setPagedUsers(data.learners || []);
+      setServerTotalUsers(data.pagination?.total || 0);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsUsersLoading(false);
+    }
+  };
 
   const loadDashboard = async () => {
     const data = await apiRequest('/admin/dashboard');
@@ -161,6 +176,8 @@ const AdminPortal = () => {
     setCourseLearners(data.learners || []);
     const moduleData = await apiRequest(`/admin/courses/${course.id}/modules`);
     setModules(moduleData.modules || []);
+    const videosData = await apiRequest(`/admin/courses/${course.id}/videos`);
+    setCourseVideos(videosData.videos || []);
     const docsData = await apiRequest(`/admin/courses/${course.id}/documents`);
     setCourseDocuments(docsData.documents || []);
     setVideoForm({ title: '', videoUrl: '' });
@@ -241,11 +258,9 @@ const AdminPortal = () => {
       }
       setVideoForm({ title: '', videoUrl: '' });
       setEditingVideoId(null);
-      await loadDashboard();
-      const refreshed = await apiRequest('/admin/dashboard');
-      const latest = (refreshed.courses || []).find((item) => item.id === selectedCourse.id);
-      if (latest) setSelectedCourse(latest);
-      setStatus('Video added.');
+      const videosData = await apiRequest(`/admin/courses/${selectedCourse.id}/videos`);
+      setCourseVideos(videosData.videos || []);
+      setStatus(editingVideoId ? 'Video updated.' : 'Video added.');
     } catch (err) {
       setError(err.message);
     }
@@ -264,6 +279,11 @@ const AdminPortal = () => {
       setError(err.message);
     }
   };
+
+  useEffect(() => {
+    if (tab !== 'learners') return;
+    loadUsersPage().catch(() => {});
+  }, [tab, learnerSection, learnerPage, learnerPageSize, search]);
 
   const handleUpdateUser = async () => {
     if (!selectedUser) return;
@@ -333,11 +353,11 @@ const AdminPortal = () => {
     }
   };
 
-  const topSearchList = tab === 'courses' ? filteredCourses : filteredUsers;
+  const topSearchList = tab === 'courses' ? filteredCourses : pagedUsers;
   const learnerCount = users.filter((item) => item.role === 'user').length;
   const adminCount = users.filter((item) => item.role === 'admin').length;
   const managerCount = users.filter((item) => item.role === 'manager').length;
-  const videoCount = courses.reduce((sum, course) => sum + (course.videos?.length || 0), 0);
+  const videoCount = courses.reduce((sum, course) => sum + (course.videoCount || 0), 0);
   const maxCount = Math.max(courses.length, learnerCount, adminCount, videoCount, 1);
 
   return (
@@ -397,10 +417,16 @@ const AdminPortal = () => {
                 <section className="portal-card">
                   <h2>Course Management</h2>
                   <form className="stack-form" onSubmit={handleCreateCourse}>
+                    <label>Course Title</label>
                     <input value={courseForm.title} onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })} placeholder="Course title" required />
+                    <label>Description</label>
                     <textarea value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} placeholder="Description" />
+                    <label>Course Image Upload</label>
                     <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setCourseForm({ ...courseForm, imageUrl: await fileToDataUrl(file) }); }} required />
+                    <label>Document Upload</label>
                     <input type="file" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; const fileUrl = await fileToDataUrl(file); setNewCourseDocs((prev) => [...prev, { name: file.name, fileUrl }]); }} />
+                    <label>Document Link (optional)</label>
+                    <input placeholder="Paste a document link and press Enter" onKeyDown={(e) => { if (e.key !== 'Enter') return; e.preventDefault(); const link = e.currentTarget.value.trim(); if (!link) return; setNewCourseDocs((prev) => [...prev, { name: link, fileUrl: link }]); e.currentTarget.value = ''; }} />
                     {newCourseDocs.length ? <div className="muted-text">{newCourseDocs.length} document(s) selected.</div> : null}
                     <button type="submit">Create Course</button>
                   </form>
@@ -409,7 +435,7 @@ const AdminPortal = () => {
                     <tbody>
                       {filteredCourses.map((item) => (
                         <tr key={item.id} onClick={() => openCourse(item)}>
-                          <td>{item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="table-thumb" /> : '-'}</td><td>{item.title}</td><td>{item.description}</td><td>{item.videos?.length || 0}</td>
+                          <td>{item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="table-thumb" /> : '-'}</td><td>{item.title}</td><td>{item.description}</td><td>{item.videoCount || 0}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -441,9 +467,10 @@ const AdminPortal = () => {
                       <label>Course Image</label>
                       <input type="file" accept="image/*" disabled={!editingCourse} onChange={async (e) => { const file = e.target.files?.[0]; if (file) setCourseForm({ ...courseForm, imageUrl: await fileToDataUrl(file) }); }} />
                       {editingCourse ? <button type="button" onClick={handleUpdateCourse}>Update Course</button> : null}
-                      <label>Upload Course Document</label>
+                      <label>Upload Course Document / Add Document Link</label>
                       <div className="inline-form">
                         <input value={docForm.name} onChange={(e) => setDocForm({ ...docForm, name: e.target.value })} placeholder="Document name" />
+                        <input value={docForm.fileUrl} onChange={(e) => setDocForm({ ...docForm, fileUrl: e.target.value })} placeholder="Document link (or choose file)" />
                         <input type="file" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setDocForm({ name: file.name, fileUrl: await fileToDataUrl(file) }); }} />
                         <button type="button" onClick={async () => { if (!docForm.name || !docForm.fileUrl) return; await apiRequest(`/admin/courses/${selectedCourse.id}/documents`, { method: 'POST', body: JSON.stringify(docForm) }); const docsData = await apiRequest(`/admin/courses/${selectedCourse.id}/documents`); setCourseDocuments(docsData.documents || []); setDocForm({ name: '', fileUrl: '' }); setStatus('Document uploaded.'); }}>Upload</button>
                       </div>
@@ -454,7 +481,7 @@ const AdminPortal = () => {
                             <tr key={doc.id}>
                               <td>{idx + 1}</td>
                               <td>{doc.name}</td>
-                              <td><a href={doc.fileUrl} target="_blank" rel="noreferrer">Open</a></td>
+                              <td><button type="button" onClick={() => setPreviewDoc(doc)}>Open</button></td>
                               <td><button type="button" onClick={async () => { await apiRequest(`/admin/courses/${selectedCourse.id}/documents/${doc.id}`, { method: 'DELETE' }); const docsData = await apiRequest(`/admin/courses/${selectedCourse.id}/documents`); setCourseDocuments(docsData.documents || []); }}>🗑️</button></td>
                             </tr>
                           ))}
@@ -465,11 +492,28 @@ const AdminPortal = () => {
 
                   {courseViewTab === 'videos' ? (
                     <>
-                      <h3>Modules</h3>
                       <div className="inline-form">
-                        <input value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder="New module title" />
-                        <button type="button" onClick={async () => { if (!moduleTitle.trim()) return; await apiRequest(`/admin/courses/${selectedCourse.id}/modules`, { method: 'POST', body: JSON.stringify({ title: moduleTitle }) }); const moduleData = await apiRequest(`/admin/courses/${selectedCourse.id}/modules`); setModules(moduleData.modules || []); setModuleTitle(''); setStatus('Module added.'); }}>Add Module</button>
+                        <div>
+                          <label>Add / Update Video</label>
+                          <div className="inline-form">
+                            <input value={videoForm.title} onChange={(e) => setVideoForm({ ...videoForm, title: e.target.value })} placeholder="Video title" />
+                            <input value={videoForm.videoUrl} onChange={(e) => setVideoForm({ ...videoForm, videoUrl: e.target.value })} placeholder="YouTube / Drive / Link" />
+                            <select value={videoForm.moduleId || ''} onChange={(e) => setVideoForm({ ...videoForm, moduleId: e.target.value ? Number(e.target.value) : '' })}>
+                              <option value="">No Module</option>
+                              {modules.map((moduleItem) => <option key={moduleItem.id} value={moduleItem.id}>{moduleItem.title}</option>)}
+                            </select>
+                            <button type="button" onClick={handleAddVideo}>{editingVideoId ? 'Update Video' : 'Add Video'}</button>
+                          </div>
+                        </div>
+                        <div>
+                          <label>Create Module</label>
+                          <div className="inline-form">
+                            <input value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder="New module title" />
+                            <button type="button" onClick={async () => { try { if (!moduleTitle.trim()) return; await apiRequest(`/admin/courses/${selectedCourse.id}/modules`, { method: 'POST', body: JSON.stringify({ title: moduleTitle }) }); const moduleData = await apiRequest(`/admin/courses/${selectedCourse.id}/modules`); setModules(moduleData.modules || []); setModuleTitle(''); setStatus('Module added.'); } catch (err) { setError(err.message); } }}>Add Module</button>
+                          </div>
+                        </div>
                       </div>
+                      <h3>Modules</h3>
                       <table className="data-table">
                         <thead><tr><th>S.No</th><th>Module</th><th>Videos</th><th>Edit</th><th>Delete</th></tr></thead>
                         <tbody>
@@ -512,26 +556,17 @@ const AdminPortal = () => {
                       <table className="data-table">
                         <thead><tr><th>S.No</th><th>Title</th><th>Link</th><th>Edit</th><th>Delete</th></tr></thead>
                         <tbody>
-                          {(selectedCourse.videos || []).map((v, idx) => (
+                          {(courseVideos || []).map((v, idx) => (
                             <tr key={v.id}>
                               <td>{idx + 1}</td>
                               <td>{v.title}</td>
                               <td><a href={v.videoUrl} target="_blank" rel="noreferrer">Open</a></td>
                               <td><button type="button" onClick={() => { setEditingVideoId(v.id); setVideoForm({ title: v.title, videoUrl: v.videoUrl, moduleId: v.moduleId || '' }); }}>✏️</button></td>
-                              <td><button type="button" onClick={async () => { await apiRequest(`/admin/courses/${selectedCourse.id}/videos/${v.id}`, { method: 'DELETE' }); await openCourse(selectedCourse); await loadDashboard(); setStatus('Video deleted.'); }}>🗑️</button></td>
+                              <td><button type="button" onClick={async () => { try { await apiRequest(`/admin/courses/${selectedCourse.id}/videos/${v.id}`, { method: 'DELETE' }); const videosData = await apiRequest(`/admin/courses/${selectedCourse.id}/videos`); setCourseVideos(videosData.videos || []); setStatus('Video deleted.'); } catch (err) { setError(err.message); } }}>🗑️</button></td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                      <div className="inline-form">
-                        <input value={videoForm.title} onChange={(e) => setVideoForm({ ...videoForm, title: e.target.value })} placeholder="Video title" />
-                        <input value={videoForm.videoUrl} onChange={(e) => setVideoForm({ ...videoForm, videoUrl: e.target.value })} placeholder="Video URL" />
-                        <select value={videoForm.moduleId || ''} onChange={(e) => setVideoForm({ ...videoForm, moduleId: e.target.value ? Number(e.target.value) : '' })}>
-                          <option value="">No Module</option>
-                          {modules.map((moduleItem) => <option key={moduleItem.id} value={moduleItem.id}>{moduleItem.title}</option>)}
-                        </select>
-                        <button type="button" onClick={handleAddVideo}>{editingVideoId ? 'Update Video' : 'Add Video'}</button>
-                      </div>
                     </>
                   ) : null}
 
@@ -603,6 +638,7 @@ const AdminPortal = () => {
                   <div className="inline-form" style={{ gridTemplateColumns: 'repeat(2, auto)', justifyContent: 'start' }}>
                     <button type="button" className={learnerSection === 'user' ? 'nav-active' : ''} onClick={() => { setLearnerSection('user'); setLearnerPage(1); }}>Learners</button>
                     <button type="button" className={learnerSection === 'admin' ? 'nav-active' : ''} onClick={() => { setLearnerSection('admin'); setLearnerPage(1); }}>Admins</button>
+                    <button type="button" className={learnerSection === 'manager' ? 'nav-active' : ''} onClick={() => { setLearnerSection('manager'); setLearnerPage(1); }}>Managers</button>
                   </div>
                   <form className="stack-form" onSubmit={handleCreateUser}>
                     <input value={userForm.fullName} onChange={(e) => setUserForm({ ...userForm, fullName: e.target.value })} placeholder="Full name" required />
@@ -617,6 +653,7 @@ const AdminPortal = () => {
                     <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) setUserForm({ ...userForm, profileImage: await fileToDataUrl(file) }); }} required={userForm.role === 'user'} />
                     <button type="submit">Create User</button>
                   </form>
+                  {isUsersLoading ? <div className="status-banner">Loading users...</div> : null}
                   <table className="data-table"><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th></tr></thead><tbody>{pagedUsers.map((item) => <tr key={item.id} onClick={() => openUser(item)}><td>{item.fullName}</td><td>{item.username}</td><td>{item.email}</td><td>{item.role}</td></tr>)}</tbody></table>
                   <div className="inline-form" style={{ gridTemplateColumns: 'auto auto auto auto', alignItems: 'center' }}>
                     <span>Show</span>
@@ -684,6 +721,19 @@ const AdminPortal = () => {
                 <button type="button" onClick={handleSettingsSave}>Save Settings</button>
               </form>
             </section>
+          ) : null}
+          {previewDoc ? (
+            <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setPreviewDoc(null)}>
+              <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <strong>{previewDoc.name || 'Document'}</strong>
+                  <button type="button" onClick={() => setPreviewDoc(null)}>Close</button>
+                </div>
+                <div className="modal-body">
+                  <iframe title={previewDoc.name || 'Document'} src={previewDoc.fileUrl} className="modal-frame" />
+                </div>
+              </div>
+            </div>
           ) : null}
         </main>
       </div>

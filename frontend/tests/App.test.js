@@ -31,7 +31,7 @@ describe('App routing', () => {
     globalThis.window.history.pushState({}, '', '/admin');
     render(<App />);
 
-    expect(await screen.findByText(/admin control center/i)).toBeInTheDocument();
+    expect(await screen.findByText(/admin console/i)).toBeInTheDocument();
   });
 });
 

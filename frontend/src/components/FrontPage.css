@@ -29,7 +29,10 @@
   max-width: 640px;
   font-size: 3rem;
   line-height: 1.1;
-  color: #ffffff;
+  background: linear-gradient(90deg, #2e55ff 0%, #22c55e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .brand-subtitle {
